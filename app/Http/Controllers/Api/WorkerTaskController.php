@@ -3,7 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
-use App\Services\Kafka\KafkaMessageProducer;
+use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,7 +12,7 @@ use Illuminate\Support\Str;
 class WorkerTaskController extends Controller
 {
     public function __construct(
-        private readonly KafkaMessageProducer $producer,
+        private readonly WorkerTaskDispatchService $dispatcher,
         private readonly WorkerTaskMonitorService $monitor
     )
     {
@@ -48,19 +48,25 @@ class WorkerTaskController extends Controller
             $key
         );
 
-        $this->producer->publish(
+        $dispatch = $this->dispatcher->dispatch(
             (string) config('workerhub.kafka.topics.requests'),
             $message,
             $key,
             $validated['headers'] ?? []
         );
 
-        $this->monitor->markPublished($taskId);
+        if ($dispatch['mode'] === 'kafka') {
+            $this->monitor->markPublished($taskId);
+        } else {
+            $this->monitor->markQueued($taskId, (string) $dispatch['queue']);
+        }
 
         return response()->json([
             'accepted' => true,
             'task_id' => $taskId,
             'topic' => config('workerhub.kafka.topics.requests'),
+            'dispatch_mode' => $dispatch['mode'],
+            'queue' => $dispatch['queue'],
             'key' => $key,
         ], 202);
     }

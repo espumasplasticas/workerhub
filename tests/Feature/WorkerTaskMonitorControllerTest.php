@@ -12,6 +12,14 @@ class WorkerTaskMonitorControllerTest extends TestCase
 {
     use RefreshDatabase;
 
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config()->set('workerhub.operations.allow_local_bypass', true);
+        config()->set('workerhub.operations.access_token', '');
+    }
+
     public function test_it_returns_monitor_summary(): void
     {
         WorkerTask::query()->create([
@@ -205,7 +213,7 @@ class WorkerTaskMonitorControllerTest extends TestCase
     public function test_it_replays_a_failed_task_and_creates_a_child_task(): void
     {
         $producer = Mockery::mock(KafkaMessageProducer::class);
-        $producer->shouldReceive('publish')->once();
+        $producer->shouldReceive('publish')->once()->andReturn(true);
         $this->app->instance(KafkaMessageProducer::class, $producer);
 
         WorkerTask::query()->create([
@@ -255,7 +263,7 @@ class WorkerTaskMonitorControllerTest extends TestCase
     public function test_it_replays_multiple_failed_tasks_in_batch(): void
     {
         $producer = Mockery::mock(KafkaMessageProducer::class);
-        $producer->shouldReceive('publish')->twice();
+        $producer->shouldReceive('publish')->twice()->andReturn(true);
         $this->app->instance(KafkaMessageProducer::class, $producer);
 
         WorkerTask::query()->create([
@@ -295,7 +303,7 @@ class WorkerTaskMonitorControllerTest extends TestCase
     public function test_it_replays_tasks_using_current_filters(): void
     {
         $producer = Mockery::mock(KafkaMessageProducer::class);
-        $producer->shouldReceive('publish')->once();
+        $producer->shouldReceive('publish')->once()->andReturn(true);
         $this->app->instance(KafkaMessageProducer::class, $producer);
 
         WorkerTask::query()->create([

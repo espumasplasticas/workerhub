@@ -3,6 +3,7 @@
 namespace App\Jobs;
 
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Models\WorkerTask;
 use App\Services\Kafka\KafkaMessageProducer;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
@@ -36,65 +37,49 @@ class DispatchWorkerTaskJob implements ShouldQueue
     ): void
     {
         $taskId = (string) ($this->task['task_id'] ?? '');
-        if ($taskId !== '') {
-            $monitor->markProcessing($taskId, $this->attempts());
+
+        try {
+            if ($taskId !== '') {
+                $monitor->markProcessing($taskId, $this->attempts());
+            }
+
+            $result = $router->handle($this->task);
+            $documentId = $this->task['payload']['document_id'] ?? null;
+
+            if ($taskId !== '') {
+                $monitor->markCompleted($taskId, $result);
+            }
+
+            $producer->publishResult([
+                'event' => 'worker_task.completed',
+                'status' => 'completed',
+                'type' => $this->task['type'] ?? 'unknown',
+                'task_id' => $this->task['task_id'] ?? null,
+                'document_id' => $documentId,
+                'source' => $this->task['payload']['source'] ?? null,
+                'processed_at' => now()->toIso8601String(),
+                'result' => $result,
+            ], is_scalar($documentId) ? (string) $documentId : null);
+        } catch (Throwable $exception) {
+            $this->reportFailure($exception, $monitor, $producer);
+
+            throw $exception;
         }
-
-        $result = $router->handle($this->task);
-        $documentId = $this->task['payload']['document_id'] ?? null;
-
-        if ($taskId !== '') {
-            $monitor->markCompleted($taskId, $result);
-        }
-
-        $producer->publishResult([
-            'event' => 'worker_task.completed',
-            'status' => 'completed',
-            'type' => $this->task['type'] ?? 'unknown',
-            'task_id' => $this->task['task_id'] ?? null,
-            'document_id' => $documentId,
-            'source' => $this->task['payload']['source'] ?? null,
-            'processed_at' => now()->toIso8601String(),
-            'result' => $result,
-        ], is_scalar($documentId) ? (string) $documentId : null);
     }
 
     public function failed(Throwable $exception): void
     {
         $taskId = (string) ($this->task['task_id'] ?? '');
-        if ($taskId !== '') {
-            app(WorkerTaskMonitorService::class)->markFailed(
-                $taskId,
-                $exception->getMessage(),
-                $exception instanceof WorkerTaskProcessingException ? $exception->context() : [],
-                $this->attempts()
-            );
+
+        if ($taskId !== '' && WorkerTask::query()->whereKey($taskId)->whereIn('status', ['failed', 'rejected'])->exists()) {
+            return;
         }
 
-        app(KafkaMessageProducer::class)->publishFailure([
-            'event' => 'worker_task.failed',
-            'status' => 'failed',
-            'type' => $this->task['type'] ?? 'unknown',
-            'task_id' => $this->task['task_id'] ?? null,
-            'document_id' => $this->task['payload']['document_id'] ?? null,
-            'source' => $this->task['payload']['source'] ?? null,
-            'failed_at' => now()->toIso8601String(),
-            'error' => $exception->getMessage(),
-            'context' => $exception instanceof WorkerTaskProcessingException ? $exception->context() : [],
-        ], isset($this->task['payload']['document_id']) ? (string) $this->task['payload']['document_id'] : null);
-
-        app(KafkaMessageProducer::class)->publishDeadLetter([
-            'event' => 'worker_task.dead_letter',
-            'status' => 'failed',
-            'type' => $this->task['type'] ?? 'unknown',
-            'task_id' => $this->task['task_id'] ?? null,
-            'document_id' => $this->task['payload']['document_id'] ?? null,
-            'source' => $this->task['payload']['source'] ?? null,
-            'failed_at' => now()->toIso8601String(),
-            'error' => $exception->getMessage(),
-            'task' => $this->task,
-            'context' => $exception instanceof WorkerTaskProcessingException ? $exception->context() : [],
-        ], isset($this->task['payload']['document_id']) ? (string) $this->task['payload']['document_id'] : null);
+        $this->reportFailure(
+            $exception,
+            app(WorkerTaskMonitorService::class),
+            app(KafkaMessageProducer::class)
+        );
     }
 
     public function tags(): array
@@ -112,5 +97,49 @@ class DispatchWorkerTaskJob implements ShouldQueue
         $value = $this->task[$key] ?? null;
 
         return is_numeric($value) ? (int) $value : $default;
+    }
+
+    private function reportFailure(
+        Throwable $exception,
+        WorkerTaskMonitorService $monitor,
+        KafkaMessageProducer $producer
+    ): void {
+        $taskId = (string) ($this->task['task_id'] ?? '');
+        $documentId = $this->task['payload']['document_id'] ?? null;
+        $context = $exception instanceof WorkerTaskProcessingException ? $exception->context() : [];
+
+        if ($taskId !== '') {
+            $monitor->markFailed(
+                $taskId,
+                $exception->getMessage(),
+                $context,
+                $this->attempts()
+            );
+        }
+
+        $producer->publishFailure([
+            'event' => 'worker_task.failed',
+            'status' => 'failed',
+            'type' => $this->task['type'] ?? 'unknown',
+            'task_id' => $this->task['task_id'] ?? null,
+            'document_id' => $documentId,
+            'source' => $this->task['payload']['source'] ?? null,
+            'failed_at' => now()->toIso8601String(),
+            'error' => $exception->getMessage(),
+            'context' => $context,
+        ], is_scalar($documentId) ? (string) $documentId : null);
+
+        $producer->publishDeadLetter([
+            'event' => 'worker_task.dead_letter',
+            'status' => 'failed',
+            'type' => $this->task['type'] ?? 'unknown',
+            'task_id' => $this->task['task_id'] ?? null,
+            'document_id' => $documentId,
+            'source' => $this->task['payload']['source'] ?? null,
+            'failed_at' => now()->toIso8601String(),
+            'error' => $exception->getMessage(),
+            'task' => $this->task,
+            'context' => $context,
+        ], is_scalar($documentId) ? (string) $documentId : null);
     }
 }

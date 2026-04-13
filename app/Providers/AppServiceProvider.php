@@ -10,6 +10,7 @@ use App\Services\Kafka\KafkaConfigFactory;
 use App\Services\Kafka\KafkaMessageProducer;
 use App\Services\Kafka\WorkerTaskConsumer;
 use App\Services\Workers\DocumentMigrationService;
+use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskNotificationService;
 use App\Services\Workers\WorkerOperationLogService;
@@ -30,6 +31,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(KafkaConfigFactory::class);
         $this->app->singleton(KafkaMessageProducer::class);
         $this->app->singleton(DocumentMigrationService::class);
+        $this->app->singleton(WorkerTaskDispatchService::class);
         $this->app->singleton(WorkerTaskNotificationService::class);
         $this->app->singleton(WorkerTaskMonitorService::class);
         $this->app->singleton(WorkerOperationLogService::class);

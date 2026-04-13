@@ -17,11 +17,12 @@
 ## Flujo operativo
 
 1. Una aplicacion llama primero a Laravel `WorkerHub`.
-2. `WorkerHub` registra la tarea, la publica en Kafka y deja trazabilidad en SQL Server.
-3. `kafka-consumer` consume el mensaje y lo convierte en un job Redis.
-4. `Horizon` ajusta la cantidad de procesos por cola segun la carga.
-5. El job procesa la tarea.
-6. WorkerHub publica resultado o fallo en Kafka y emite eventos por sockets para el monitor.
+2. `WorkerHub` registra la tarea y deja trazabilidad en SQL Server.
+3. Si Kafka esta habilitado, publica en Kafka y `kafka-consumer` convierte el mensaje en un job Redis.
+4. Si Kafka esta deshabilitado en desarrollo, `WorkerHub` puede usar `direct_queue` hacia Redis.
+5. `Horizon` ajusta la cantidad de procesos por cola segun la carga.
+6. El job procesa la tarea.
+7. WorkerHub publica resultado o fallo en Kafka cuando ese canal esta habilitado y emite eventos por sockets para el monitor.
 
 ## Servicios
 
@@ -183,6 +184,9 @@ Si necesitas escalar contenedores automaticamente, el siguiente paso serio es `K
 - `DB_CONNECTION=sqlsrv`
 - `DB_HOST` y `DB_PORT` apuntando al SQL Server externo
 - `KAFKA_BROKERS=redpanda:9092`
+- `KAFKA_PUBLISH_ENABLED`
+- `WORKERHUB_KAFKA_DIRECT_DISPATCH_FALLBACK`
+- `WORKERHUB_KAFKA_SUPPRESS_PUBLISH_FAILURES`
 - `KAFKA_TOPIC_REQUESTS=workerhub.tasks.requests`
 - `KAFKA_TOPIC_RESULTS=workerhub.tasks.results`
 - `KAFKA_TOPIC_FAILURES=workerhub.tasks.failures`
@@ -205,6 +209,30 @@ Si necesitas escalar contenedores automaticamente, el siguiente paso serio es `K
 ## Nota sobre epsa_library
 
 `WorkerHub` ya esta preparado para resolver `Epsalibrary\Contracts\ImportManagerInterface` desde Laravel y usarlo dentro del job `document_migration`. Solo falta completar las variables `EPSA_SIESA_*` reales del ambiente donde importaras.
+
+## Validacion local cerrada
+
+Flujo validado en desarrollo:
+
+- login real en `http://127.0.0.1:5010/login` contra `backoffice_service`
+- healthcheck `ok` en `GET /api/health/workerhub`
+- creacion de tarea por `POST /api/document-migrations`
+- despacho en modo `direct_queue` hacia Redis cuando Kafka local no esta disponible
+- procesamiento con `php artisan queue:work redis --queue=migration-default --once`
+- fallo controlado de `epsa_library` por falta de configuracion SOAP real
+- replay manual por `POST /api/monitor/tasks/{task_id}/retry`
+- consulta de lineage por `GET /api/monitor/tasks/{task_id}/lineage`
+
+Si quieres operar exactamente en este modo de desarrollo, usa:
+
+```env
+KAFKA_PUBLISH_ENABLED=false
+WORKERHUB_KAFKA_DIRECT_DISPATCH_FALLBACK=true
+WORKERHUB_KAFKA_SUPPRESS_PUBLISH_FAILURES=true
+QUEUE_CONNECTION=redis
+CACHE_DRIVER=redis
+REDIS_CLIENT=predis
+```
 
 ## Migraciones nuevas
 

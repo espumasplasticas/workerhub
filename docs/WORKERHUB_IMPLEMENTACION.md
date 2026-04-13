@@ -18,6 +18,7 @@
 - Se agregaron filtros operativos extendidos, export de tareas/auditoria, retry filtrado y lineage de replays.
 - Se agrego autenticacion productiva en WorkerHub delegada a `backoffice_service` con sesion web propia y fallback tecnico auditado.
 - Se agregaron healthchecks operativos para SQL Server, Redis, Kafka, backoffice auth y umbral de dead letters.
+- Se agrego un modo de desarrollo `direct_queue` para operar sin Kafka local y validar el flujo end-to-end sobre Redis.
 
 3) Logica de negocio
 
@@ -69,6 +70,7 @@
 
 - Flujo general
 - Laravel recibe tarea, la registra y la publica en Kafka
+- En desarrollo puede despachar directo a Redis cuando Kafka esta deshabilitado de forma explicita
 - Kafka consumer recibe, valida y encola en Redis
 - Horizon ejecuta y balancea workers por demanda
 - El monitor registra transiciones y resultados
@@ -90,6 +92,7 @@
 - `WorkerHubSessionController`
 - `WorkerHubOperatorSessionManager`
 - `WorkerHubHealthService`
+- `WorkerTaskDispatchService`
 - Flujo de datos (fuente-> procesamiento-> almacenamiento -> consumidores)
 - Cliente -> API Laravel -> Kafka -> Redis/Horizon -> servicio de negocio -> SQL Server + Kafka results/failures + sockets + notificaciones
 - Operador -> WorkerHub login -> backoffice_service -> sesion web -> monitor operativo
@@ -202,6 +205,7 @@
 - SQL Server caido: no hay monitor persistente; se debe tratar como dependencia critica
 - Docker Compose no escala contenedores solo: usar Horizon ahora y KEDA/Kubernetes despues
 - La DLQ operativa se consulta desde base de datos y los eventos terminales tambien se publican al topic Kafka dedicado de dead letters
+- En desarrollo sin Kafka real se puede usar `KAFKA_PUBLISH_ENABLED=false` + `WORKERHUB_KAFKA_DIRECT_DISPATCH_FALLBACK=true` para validar cola, monitor, fallo y replay
 
 16) Diagrama de flujo
 

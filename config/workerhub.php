@@ -19,6 +19,9 @@ return [
     'kafka' => [
         'brokers' => env('KAFKA_BROKERS', 'redpanda:9092'),
         'client_id' => env('KAFKA_CLIENT_ID', 'workerhub'),
+        'publish_enabled' => filter_var(env('KAFKA_PUBLISH_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'direct_dispatch_fallback' => filter_var(env('WORKERHUB_KAFKA_DIRECT_DISPATCH_FALLBACK', false), FILTER_VALIDATE_BOOL),
+        'suppress_publish_failures' => filter_var(env('WORKERHUB_KAFKA_SUPPRESS_PUBLISH_FAILURES', false), FILTER_VALIDATE_BOOL),
         'connect_timeout' => (float) env('KAFKA_CONNECT_TIMEOUT', 10),
         'send_timeout' => (float) env('KAFKA_SEND_TIMEOUT', 10),
         'recv_timeout' => (float) env('KAFKA_RECV_TIMEOUT', 10),

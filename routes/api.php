@@ -25,7 +25,7 @@ Route::middleware('auth:sanctum')->get('/user', function (Request $request) {
 Route::get('/health/workerhub', HealthController::class);
 Route::post('/worker-tasks', [WorkerTaskController::class, 'store']);
 Route::post('/document-migrations', [DocumentMigrationController::class, 'store']);
-Route::middleware('workerhub.operator')->group(function () {
+Route::middleware(['web', 'workerhub.operator'])->group(function () {
     Route::get('/monitor/tasks', [WorkerTaskMonitorController::class, 'index']);
     Route::get('/monitor/tasks/export', [WorkerTaskMonitorController::class, 'exportTasks']);
     Route::get('/monitor/tasks/summary', [WorkerTaskMonitorController::class, 'summary']);

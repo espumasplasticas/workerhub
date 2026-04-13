@@ -4,7 +4,6 @@ namespace App\Services\Workers;
 
 use App\Data\MonitorTaskFilters;
 use App\Models\WorkerTask;
-use App\Services\Kafka\KafkaMessageProducer;
 use Illuminate\Support\Str;
 use InvalidArgumentException;
 
@@ -12,7 +11,7 @@ class WorkerTaskReplayService
 {
     public function __construct(
         private readonly WorkerTaskMonitorService $monitor,
-        private readonly KafkaMessageProducer $producer
+        private readonly WorkerTaskDispatchService $dispatcher
     ) {
     }
 
@@ -52,8 +51,14 @@ class WorkerTaskReplayService
         $topic = (string) config('workerhub.kafka.topics.requests');
 
         $this->monitor->createTask($message, $topic, $key);
-        $this->producer->publish($topic, $message, $key, $headers);
-        $this->monitor->markPublished($newTaskId);
+        $dispatch = $this->dispatcher->dispatch($topic, $message, $key, $headers);
+
+        if ($dispatch['mode'] === 'kafka') {
+            $this->monitor->markPublished($newTaskId);
+        } else {
+            $this->monitor->markQueued($newTaskId, (string) $dispatch['queue']);
+        }
+
         $this->monitor->markReplayed($taskId, $newTaskId);
 
         return [
@@ -61,6 +66,8 @@ class WorkerTaskReplayService
             'task_id' => $newTaskId,
             'replayed_from_task_id' => $taskId,
             'topic' => $topic,
+            'dispatch_mode' => $dispatch['mode'],
+            'queue' => $dispatch['queue'],
             'key' => $key,
         ];
     }

@@ -54,9 +54,14 @@ class WorkerHubHealthService
     {
         try {
             $response = Redis::connection()->ping();
+            $normalizedResponse = is_string($response)
+                ? strtoupper($response)
+                : (is_object($response) && method_exists($response, '__toString')
+                    ? strtoupper((string) $response)
+                    : $response);
 
             return [
-                'ok' => in_array($response, [true, '+PONG', 'PONG'], true),
+                'ok' => in_array($normalizedResponse, [true, '+PONG', 'PONG'], true),
                 'critical' => true,
             ];
         } catch (Throwable $exception) {
@@ -67,12 +72,17 @@ class WorkerHubHealthService
     private function checkKafkaConfig(): array
     {
         $brokers = (string) config('workerhub.kafka.brokers');
+        $publishEnabled = (bool) config('workerhub.kafka.publish_enabled', true);
+        $directDispatchFallback = (bool) config('workerhub.kafka.direct_dispatch_fallback', false);
 
         return [
             'ok' => $brokers !== '',
             'critical' => true,
             'brokers' => $brokers,
             'requests_topic' => config('workerhub.kafka.topics.requests'),
+            'publish_enabled' => $publishEnabled,
+            'direct_dispatch_fallback' => $directDispatchFallback,
+            'dispatch_mode' => $publishEnabled ? 'kafka' : ($directDispatchFallback ? 'direct_queue' : 'disabled'),
         ];
     }
 
