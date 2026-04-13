@@ -2,6 +2,8 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Data\MonitorTaskFilters;
+use App\Data\OperationLogFilters;
 use App\Http\Controllers\Controller;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerOperationLogService;
@@ -22,14 +24,17 @@ class WorkerTaskMonitorController extends Controller
 
     public function index(Request $request): JsonResponse
     {
+        $filters = MonitorTaskFilters::fromArray($request->all());
         $tasks = $this->monitor->listTasks(
-            $request->only(['status', 'type', 'source']),
+            $filters,
             (int) $request->integer('per_page', 25)
         );
 
-        $this->operationLogs->record($request, 'monitor.tasks.index', 'success', null, [
-            'filters' => $request->only(['status', 'type', 'source']),
-        ]);
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.tasks.index', 'success', null, [
+                'filters' => $filters->toArray(),
+            ]);
+        }
 
         return response()->json($tasks);
     }
@@ -43,57 +48,97 @@ class WorkerTaskMonitorController extends Controller
 
     public function summary(Request $request): JsonResponse
     {
-        $this->operationLogs->record($request, 'monitor.tasks.summary', 'success');
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.tasks.summary', 'success');
+        }
 
         return response()->json($this->monitor->summary());
     }
 
     public function deadLetters(Request $request): JsonResponse
     {
-        $this->operationLogs->record($request, 'monitor.dead_letters.index', 'success');
+        $filters = MonitorTaskFilters::fromArray($request->all(), true);
+
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.dead_letters.index', 'success');
+        }
 
         return response()->json(
-            $this->monitor->listDeadLetters((int) $request->integer('per_page', 25))
+            $this->monitor->listDeadLetters($filters, (int) $request->integer('per_page', 25))
         );
     }
 
     public function exportDeadLetters(Request $request): JsonResponse
     {
-        $tasks = $this->monitor->listDeadLetters((int) $request->integer('per_page', 100))->items();
-
-        $payload = array_map(static function ($task) {
-            return [
-                'id' => $task->id,
-                'type' => $task->type,
-                'source' => $task->source,
-                'status' => $task->status,
-                'priority' => $task->priority,
-                'queue' => $task->queue,
-                'attempts' => $task->attempts,
-                'error_message' => $task->error_message,
-                'payload' => $task->payload,
-                'metadata' => $task->metadata,
-            ];
-        }, $tasks);
+        $filters = MonitorTaskFilters::fromArray($request->all(), true);
+        $payload = $this->monitor->exportDeadLetters($filters, (int) $request->integer('limit', 250));
 
         $this->operationLogs->record($request, 'dead_letters.export', 'success', null, [
             'count' => count($payload),
+            'filters' => $filters->toArray(),
         ]);
 
         return response()->json([
             'exported_at' => now()->toIso8601String(),
             'count' => count($payload),
+            'filters' => $filters->toArray(),
             'items' => $payload,
         ]);
     }
 
     public function actions(Request $request): JsonResponse
     {
-        $this->operationLogs->record($request, 'monitor.actions.index', 'success');
+        $filters = OperationLogFilters::fromArray($request->all());
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.actions.index', 'success');
+        }
 
         return response()->json(
-            $this->operationLogs->listRecent((int) $request->integer('per_page', 25))
+            $this->operationLogs->listRecent($filters, (int) $request->integer('per_page', 25))
         );
+    }
+
+    public function exportTasks(Request $request): JsonResponse
+    {
+        $filters = MonitorTaskFilters::fromArray($request->all());
+        $payload = $this->monitor->exportTasks($filters, (int) $request->integer('limit', 250));
+
+        $this->operationLogs->record($request, 'monitor.tasks.export', 'success', null, [
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json([
+            'exported_at' => now()->toIso8601String(),
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+            'items' => $payload,
+        ]);
+    }
+
+    public function exportActions(Request $request): JsonResponse
+    {
+        $filters = OperationLogFilters::fromArray($request->all());
+        $payload = $this->operationLogs->export($filters, (int) $request->integer('limit', 250));
+
+        $this->operationLogs->record($request, 'monitor.actions.export', 'success', null, [
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json([
+            'exported_at' => now()->toIso8601String(),
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+            'items' => $payload,
+        ]);
+    }
+
+    public function lineage(Request $request, string $taskId): JsonResponse
+    {
+        $this->operationLogs->record($request, 'monitor.tasks.lineage', 'success', $taskId);
+
+        return response()->json($this->monitor->getTaskLineage($taskId));
     }
 
     public function socketConfig(): JsonResponse
@@ -147,5 +192,26 @@ class WorkerTaskMonitorController extends Controller
         ]);
 
         return response()->json($result, 202);
+    }
+
+    public function retryFiltered(Request $request): JsonResponse
+    {
+        $filters = MonitorTaskFilters::fromArray($request->all());
+        $limit = (int) $request->integer('limit', 100);
+        $result = $this->replayService->replayFiltered($filters, $limit);
+
+        $this->operationLogs->record($request, 'task.retry_filtered', 'success', null, [
+            'matched_count' => $result['matched_count'],
+            'accepted_count' => $result['accepted_count'],
+            'error_count' => $result['error_count'],
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json($result, 202);
+    }
+
+    private function shouldRecord(Request $request): bool
+    {
+        return !filter_var($request->query('silent', false), FILTER_VALIDATE_BOOLEAN);
     }
 }

@@ -27,12 +27,16 @@ Route::post('/worker-tasks', [WorkerTaskController::class, 'store']);
 Route::post('/document-migrations', [DocumentMigrationController::class, 'store']);
 Route::middleware('workerhub.operator')->group(function () {
     Route::get('/monitor/tasks', [WorkerTaskMonitorController::class, 'index']);
+    Route::get('/monitor/tasks/export', [WorkerTaskMonitorController::class, 'exportTasks']);
     Route::get('/monitor/tasks/summary', [WorkerTaskMonitorController::class, 'summary']);
     Route::get('/monitor/dead-letters', [WorkerTaskMonitorController::class, 'deadLetters']);
     Route::get('/monitor/dead-letters/export', [WorkerTaskMonitorController::class, 'exportDeadLetters']);
     Route::get('/monitor/actions', [WorkerTaskMonitorController::class, 'actions']);
+    Route::get('/monitor/actions/export', [WorkerTaskMonitorController::class, 'exportActions']);
     Route::get('/monitor/socket-config', [WorkerTaskMonitorController::class, 'socketConfig']);
     Route::post('/monitor/tasks/retry-batch', [WorkerTaskMonitorController::class, 'retryBatch']);
+    Route::post('/monitor/tasks/retry-filtered', [WorkerTaskMonitorController::class, 'retryFiltered']);
     Route::post('/monitor/tasks/{taskId}/retry', [WorkerTaskMonitorController::class, 'retry']);
+    Route::get('/monitor/tasks/{taskId}/lineage', [WorkerTaskMonitorController::class, 'lineage']);
     Route::get('/monitor/tasks/{taskId}', [WorkerTaskMonitorController::class, 'show']);
 });

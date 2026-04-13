@@ -2,12 +2,13 @@
 
 namespace App\Services\Workers;
 
+use App\Data\MonitorTaskFilters;
 use App\Events\WorkerTaskUpdated;
 use App\Models\WorkerTask;
 use App\Models\WorkerTaskEvent;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
-use Illuminate\Support\Arr;
 use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Support\Arr;
 
 class WorkerTaskMonitorService
 {
@@ -108,28 +109,74 @@ class WorkerTaskMonitorService
         }
     }
 
-    public function listTasks(array $filters = [], int $perPage = 25): LengthAwarePaginator
+    public function listTasks(MonitorTaskFilters $filters, int $perPage = 25): LengthAwarePaginator
     {
-        return WorkerTask::query()
+        return $this->queryTasks($filters)
             ->with(['parent', 'replays'])
-            ->when(isset($filters['status']) && $filters['status'] !== '', fn (Builder $query) => $query->where('status', $filters['status']))
-            ->when(isset($filters['type']) && $filters['type'] !== '', fn (Builder $query) => $query->where('type', $filters['type']))
-            ->when(isset($filters['source']) && $filters['source'] !== '', fn (Builder $query) => $query->where('source', $filters['source']))
-            ->when(($filters['only_dead_letters'] ?? false), fn (Builder $query) => $query->whereIn('status', ['failed', 'rejected']))
             ->latest('requested_at')
             ->paginate($perPage);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function exportTasks(MonitorTaskFilters $filters, int $limit = 250): array
+    {
+        return $this->queryTasks($filters)
+            ->with(['parent', 'replays'])
+            ->latest('requested_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn (WorkerTask $task) => $this->serializeTask($task))
+            ->all();
     }
 
     public function getTask(string $taskId): WorkerTask
     {
         return WorkerTask::query()
-            ->with(['events', 'parent', 'replays'])
+            ->with(['events', 'parent', 'replays', 'operationLogs'])
             ->findOrFail($taskId);
     }
 
-    public function listDeadLetters(int $perPage = 25): LengthAwarePaginator
+    public function listDeadLetters(MonitorTaskFilters $filters, int $perPage = 25): LengthAwarePaginator
     {
-        return $this->listTasks(['only_dead_letters' => true], $perPage);
+        return $this->listTasks($filters, $perPage);
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function exportDeadLetters(MonitorTaskFilters $filters, int $limit = 250): array
+    {
+        return $this->exportTasks($filters, $limit);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function findReplayableTaskIds(MonitorTaskFilters $filters, int $limit = 100): array
+    {
+        return $this->queryTasks($filters)
+            ->whereIn('status', ['failed', 'rejected'])
+            ->latest('requested_at')
+            ->limit($limit)
+            ->pluck('id')
+            ->all();
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTaskLineage(string $taskId): array
+    {
+        $task = WorkerTask::query()->findOrFail($taskId);
+        $rootTask = $this->resolveRootTask($task);
+
+        return [
+            'requested_task_id' => $taskId,
+            'root_task_id' => $rootTask->getKey(),
+            'lineage' => $this->serializeLineageNode($rootTask, $taskId),
+        ];
     }
 
     public function summary(): array
@@ -228,5 +275,104 @@ class WorkerTaskMonitorService
         string $level = 'info'
     ): void {
         event(new WorkerTaskUpdated($task, $event, $message, $context, $level));
+    }
+
+    private function queryTasks(MonitorTaskFilters $filters): Builder
+    {
+        return WorkerTask::query()
+            ->when($filters->status !== null, fn (Builder $query) => $query->where('status', $filters->status))
+            ->when($filters->type !== null, fn (Builder $query) => $query->where('type', $filters->type))
+            ->when($filters->source !== null, fn (Builder $query) => $query->where('source', $filters->source))
+            ->when($filters->priority !== null, fn (Builder $query) => $query->where('priority', $filters->priority))
+            ->when($filters->queue !== null, fn (Builder $query) => $query->where('queue', $filters->queue))
+            ->when($filters->dateFrom !== null, fn (Builder $query) => $query->where('requested_at', '>=', $filters->dateFrom))
+            ->when($filters->dateTo !== null, fn (Builder $query) => $query->where('requested_at', '<=', $filters->dateTo))
+            ->when($filters->onlyDeadLetters, fn (Builder $query) => $query->whereIn('status', ['failed', 'rejected']))
+            ->when($filters->replayMode === 'replays', fn (Builder $query) => $query->whereNotNull('parent_task_id'))
+            ->when($filters->replayMode === 'originals', fn (Builder $query) => $query->whereNull('parent_task_id'))
+            ->when($filters->errorMode === 'with_error', function (Builder $query) {
+                $query->whereNotNull('error_message')->where('error_message', '!=', '');
+            })
+            ->when($filters->errorMode === 'without_error', function (Builder $query) {
+                $query->where(function (Builder $builder) {
+                    $builder->whereNull('error_message')->orWhere('error_message', '');
+                });
+            });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeTask(WorkerTask $task): array
+    {
+        return [
+            'id' => $task->id,
+            'parent_task_id' => $task->parent_task_id,
+            'type' => $task->type,
+            'source' => $task->source,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'queue' => $task->queue,
+            'kafka_topic' => $task->kafka_topic,
+            'kafka_key' => $task->kafka_key,
+            'attempts' => $task->attempts,
+            'error_message' => $task->error_message,
+            'requested_at' => $task->requested_at?->toIso8601String(),
+            'published_at' => $task->published_at?->toIso8601String(),
+            'queued_at' => $task->queued_at?->toIso8601String(),
+            'processing_at' => $task->processing_at?->toIso8601String(),
+            'completed_at' => $task->completed_at?->toIso8601String(),
+            'failed_at' => $task->failed_at?->toIso8601String(),
+            'replayed_at' => $task->replayed_at?->toIso8601String(),
+            'payload' => $task->payload,
+            'result' => $task->result,
+            'metadata' => $task->metadata,
+        ];
+    }
+
+    private function resolveRootTask(WorkerTask $task): WorkerTask
+    {
+        $current = $task;
+
+        while ($current->parent_task_id !== null) {
+            $parent = WorkerTask::query()->find($current->parent_task_id);
+
+            if ($parent === null) {
+                break;
+            }
+
+            $current = $parent;
+        }
+
+        return $current;
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeLineageNode(WorkerTask $task, string $selectedTaskId): array
+    {
+        $children = WorkerTask::query()
+            ->where('parent_task_id', $task->getKey())
+            ->latest('requested_at')
+            ->get()
+            ->map(fn (WorkerTask $child) => $this->serializeLineageNode($child, $selectedTaskId))
+            ->all();
+
+        return [
+            'id' => $task->id,
+            'parent_task_id' => $task->parent_task_id,
+            'type' => $task->type,
+            'status' => $task->status,
+            'priority' => $task->priority,
+            'queue' => $task->queue,
+            'error_message' => $task->error_message,
+            'requested_at' => $task->requested_at?->toIso8601String(),
+            'completed_at' => $task->completed_at?->toIso8601String(),
+            'failed_at' => $task->failed_at?->toIso8601String(),
+            'replayed_at' => $task->replayed_at?->toIso8601String(),
+            'is_selected' => $task->getKey() === $selectedTaskId,
+            'children' => $children,
+        ];
     }
 }

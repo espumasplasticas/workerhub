@@ -15,6 +15,7 @@
 - Se agrego una consola operativa web con replay manual y bandeja logica de DLQ.
 - Se agrego replay por lote, topic Kafka dedicado para dead letters y middleware de proteccion operativa.
 - Se agrego auditoria persistente de acciones operativas y export JSON de dead letters.
+- Se agregaron filtros operativos extendidos, export de tareas/auditoria, retry filtrado y lineage de replays.
 
 3) Logica de negocio
 
@@ -28,6 +29,8 @@
 - Las tareas `failed` y `rejected` pueden reencolarse manualmente preservando trazabilidad padre-hijo.
 - Los rechazos y fallos terminales se publican tambien en el topic de dead letters.
 - Toda accion operativa relevante sobre el monitor queda auditada en `worker_operation_logs`.
+- Las operaciones batch deben respetar el conjunto filtrado actual del monitor.
+- La trazabilidad de replay se conserva via `parent_task_id` y se expone como lineage.
 
 4) Alcance
 
@@ -76,6 +79,8 @@
 - `DocumentMigrationService`
 - `WorkerOperationsDashboardController`
 - `WorkerOperationLogService`
+- `MonitorTaskFilters`
+- `OperationLogFilters`
 - `EnsureWorkerHubOperatorAccess`
 - Flujo de datos (fuente-> procesamiento-> almacenamiento -> consumidores)
 - Cliente -> API Laravel -> Kafka -> Redis/Horizon -> servicio de negocio -> SQL Server + Kafka results/failures + sockets + notificaciones
@@ -89,6 +94,7 @@
 - Servicios de monitoreo y notificaciones
 - Servicio de replay operativo
 - Servicio de auditoria operativa
+- Objetos de filtros reutilizables para monitor y auditoria
 - Docker stack
 - Broadcasting por sockets
 - Publicacion Kafka a dead letters
@@ -121,6 +127,8 @@
 - ingreso de tarea y resumen del monitor
 - export de dead letters
 - auditoria de operaciones
+- retry filtrado
+- lineage de replays
 - Como verificar manualmente:
 - publicar una tarea en `/api/worker-tasks`
 - validar registro en `worker_tasks`
@@ -131,6 +139,10 @@
 - reencolar varias tareas desde `/api/monitor/tasks/retry-batch`
 - exportar dead letters desde `/api/monitor/dead-letters/export`
 - revisar historial reciente desde `/api/monitor/actions`
+- exportar tareas desde `/api/monitor/tasks/export`
+- exportar auditoria desde `/api/monitor/actions/export`
+- ejecutar retry filtrado desde `/api/monitor/tasks/retry-filtered`
+- revisar lineage desde `/api/monitor/tasks/{taskId}/lineage`
 
 13) Despliegue y puesta en marcha
 

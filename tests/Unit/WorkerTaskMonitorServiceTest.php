@@ -2,6 +2,7 @@
 
 namespace Tests\Unit;
 
+use App\Data\MonitorTaskFilters;
 use App\Events\WorkerTaskUpdated;
 use App\Models\User;
 use App\Models\WorkerTask;
@@ -52,5 +53,56 @@ class WorkerTaskMonitorServiceTest extends TestCase
             'status' => 'failed',
             'error_message' => 'Kafka timeout',
         ]);
+    }
+
+    public function test_it_applies_extended_filters_when_listing_tasks(): void
+    {
+        WorkerTask::query()->create([
+            'id' => 'task-original-ok',
+            'type' => 'document_migration',
+            'source' => 'crm',
+            'status' => 'failed',
+            'priority' => 'default',
+            'queue' => 'migration-default',
+            'requested_at' => now()->subDays(3),
+        ]);
+
+        WorkerTask::query()->create([
+            'id' => 'task-replay-hit',
+            'parent_task_id' => 'task-original-ok',
+            'type' => 'document_migration',
+            'source' => 'crm',
+            'status' => 'failed',
+            'priority' => 'high',
+            'queue' => 'migration-high',
+            'error_message' => 'retry me',
+            'requested_at' => now()->subDay(),
+        ]);
+
+        WorkerTask::query()->create([
+            'id' => 'task-replay-miss',
+            'parent_task_id' => 'task-original-ok',
+            'type' => 'document_migration',
+            'source' => 'erp',
+            'status' => 'completed',
+            'priority' => 'high',
+            'queue' => 'migration-high',
+            'requested_at' => now()->subDay(),
+        ]);
+
+        $filters = MonitorTaskFilters::fromArray([
+            'source' => 'crm',
+            'priority' => 'high',
+            'queue' => 'migration-high',
+            'replay_mode' => 'replays',
+            'error_mode' => 'with_error',
+            'date_from' => now()->subDays(2)->toDateString(),
+            'date_to' => now()->toDateString(),
+        ]);
+
+        $result = app(WorkerTaskMonitorService::class)->listTasks($filters, 25);
+
+        $this->assertSame(1, $result->total());
+        $this->assertSame('task-replay-hit', $result->items()[0]->getKey());
     }
 }

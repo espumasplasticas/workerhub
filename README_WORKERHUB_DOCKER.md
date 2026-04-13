@@ -93,11 +93,16 @@ Content-Type: application/json
 
 ```http
 GET /api/monitor/tasks
+GET /api/monitor/tasks/export
 GET /api/monitor/tasks/summary
 GET /api/monitor/dead-letters
+GET /api/monitor/actions
+GET /api/monitor/actions/export
 GET /api/monitor/socket-config
 POST /api/monitor/tasks/retry-batch
+POST /api/monitor/tasks/retry-filtered
 POST /api/monitor/tasks/{task_id}/retry
+GET /api/monitor/tasks/{task_id}/lineage
 GET /api/monitor/tasks/{task_id}
 ```
 
@@ -118,10 +123,13 @@ Cada tarea queda registrada en base de datos con historial de eventos para que L
 - URL: `http://localhost:8080/monitor`
 - Funciones:
   - resumen de estados,
-  - filtros por tipo/estado/origen,
+  - filtros por tipo, estado, origen, prioridad, queue, fechas, replay y error,
   - detalle por tarea,
+  - export de tareas y auditoria,
   - replay manual de tareas `failed` y `rejected`,
   - replay por lote,
+  - retry batch por filtros,
+  - lineage de tareas originales y replays,
   - vista operativa de DLQ logica.
 
 ## Sockets y monitoreo en tiempo real
@@ -174,6 +182,7 @@ Este flujo agrega tablas para monitoreo:
 
 - `worker_tasks`
 - `worker_task_events`
+- `worker_operation_logs`
 
 ## Documentacion tecnica
 

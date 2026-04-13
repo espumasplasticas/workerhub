@@ -7,8 +7,10 @@ Este modulo deja a `WorkerHub` no solo como API de ingreso de tareas, sino como 
 - monitorear tareas en vivo,
 - revisar dead letters,
 - exportar dead letters en JSON,
+- exportar tareas filtradas y auditoria operativa en JSON,
 - reencolar tareas terminales,
 - reencolar tareas en lote,
+- reencolar tareas terminales por filtros,
 - seguir el historial de replays,
 - auditar acciones operativas sobre el monitor.
 
@@ -25,10 +27,13 @@ La vista muestra:
 
 - resumen de volumen y estado,
 - filtros por estado, tipo y origen,
+- filtros por prioridad, queue, fechas, replay/original y presencia de error,
 - listado de tareas,
 - detalle con eventos,
+- lineage original -> replay -> replay hijo,
 - historial de acciones operativas recientes,
 - export de DLQ en JSON,
+- export de tareas filtradas y acciones filtradas,
 - accion de replay para tareas `failed` o `rejected`.
 
 ## Endpoints operativos
@@ -144,6 +149,50 @@ Devuelve acciones operativas recientes sobre el monitor, incluyendo:
 - replay individual,
 - replay por lote.
 
+### Export de tareas filtradas
+
+```http
+GET /api/monitor/tasks/export
+```
+
+Usa los mismos filtros de `GET /api/monitor/tasks`.
+
+### Export de acciones filtradas
+
+```http
+GET /api/monitor/actions/export
+```
+
+Filtros soportados:
+
+- `worker_task_id`
+- `action`
+- `status`
+- `actor`
+- `channel`
+- `date_from`
+- `date_to`
+
+### Retry por filtros
+
+```http
+POST /api/monitor/tasks/retry-filtered
+```
+
+Usa los mismos filtros de tarea y solo reencola registros terminales (`failed`, `rejected`).
+
+### Lineage de tarea
+
+```http
+GET /api/monitor/tasks/{taskId}/lineage
+```
+
+Devuelve:
+
+- `requested_task_id`
+- `root_task_id`
+- `lineage`
+
 ## Modelo de datos
 
 Campos nuevos relevantes en `worker_tasks`:
@@ -163,6 +212,19 @@ Campos relevantes:
 - `channel`
 - `worker_task_id`
 - `context`
+
+Filtros operativos de tareas soportados:
+
+- `status`
+- `type`
+- `source`
+- `priority`
+- `queue`
+- `date_from`
+- `date_to`
+- `replay_mode`
+- `error_mode`
+- `only_dead_letters`
 
 ## Regla operativa
 
@@ -201,5 +263,9 @@ Acciones auditadas en esta etapa:
 - `monitor.dead_letters.index`
 - `monitor.actions.index`
 - `dead_letters.export`
+- `monitor.tasks.export`
+- `monitor.actions.export`
+- `monitor.tasks.lineage`
 - `task.retry`
 - `task.retry_batch`
+- `task.retry_filtered`

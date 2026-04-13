@@ -2,6 +2,7 @@
 
 namespace App\Services\Workers;
 
+use App\Data\MonitorTaskFilters;
 use App\Models\WorkerTask;
 use App\Services\Kafka\KafkaMessageProducer;
 use Illuminate\Support\Str;
@@ -90,5 +91,19 @@ class WorkerTaskReplayService
             'accepted' => $accepted,
             'errors' => $errors,
         ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function replayFiltered(MonitorTaskFilters $filters, int $limit = 100): array
+    {
+        $taskIds = $this->monitor->findReplayableTaskIds($filters, $limit);
+        $result = $this->replayMany($taskIds);
+
+        $result['matched_count'] = count($taskIds);
+        $result['applied_filters'] = $filters->toArray();
+
+        return $result;
     }
 }
