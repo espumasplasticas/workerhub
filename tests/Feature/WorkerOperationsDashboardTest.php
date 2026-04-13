@@ -18,7 +18,7 @@ class WorkerOperationsDashboardTest extends TestCase
         $this->assertDatabaseHas('worker_operation_logs', [
             'action' => 'monitor.view',
             'status' => 'success',
-            'channel' => 'web',
+            'channel' => 'local_bypass',
         ]);
     }
 }

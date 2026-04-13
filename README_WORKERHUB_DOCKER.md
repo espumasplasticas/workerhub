@@ -10,7 +10,9 @@
 - `scheduler` para snapshots de Horizon.
 - `echo-server` para notificaciones en tiempo real via Socket.IO usando Redis como backend de broadcasting.
 - panel web operativo en `/monitor` con replay manual y vista de DLQ.
-- proteccion del panel y endpoints operativos mediante token o usuarios permitidos.
+- autenticacion web propia validada contra `backoffice_service`.
+- fallback tecnico por token solo para soporte/automatizacion controlada.
+- healthchecks operativos ejecutables desde contenedor con `php artisan workerhub:healthcheck`.
 
 ## Flujo operativo
 
@@ -51,6 +53,11 @@ Si ya tienes `.env` local y no quieres reemplazarlo, usa `.env.docker` solo como
 ```http
 GET /api/health/workerhub
 ```
+
+Healthchecks Docker:
+
+- `php-1`, `php-2`, `horizon`, `kafka-consumer` y `scheduler` ejecutan `php artisan workerhub:healthcheck`
+- el comando marca degradado cuando fallan SQL Server, Redis, Kafka o la dependencia de autenticacion contra backoffice
 
 ### Crear tarea generica
 
@@ -120,7 +127,8 @@ Cada tarea queda registrada en base de datos con historial de eventos para que L
 
 ## Consola operativa web
 
-- URL: `http://localhost:8080/monitor`
+- URL de acceso: `http://localhost:8080/login`
+- URL del monitor: `http://localhost:8080/monitor`
 - Funciones:
   - resumen de estados,
   - filtros por tipo, estado, origen, prioridad, queue, fechas, replay y error,
@@ -131,6 +139,20 @@ Cada tarea queda registrada en base de datos con historial de eventos para que L
   - retry batch por filtros,
   - lineage de tareas originales y replays,
   - vista operativa de DLQ logica.
+
+## Acceso operativo
+
+WorkerHub ya no usa como mecanismo principal una lista local de correos. El flujo recomendado es:
+
+1. El operador entra por `/login`.
+2. WorkerHub valida credenciales contra `backoffice_service`.
+3. Solo usuarios activos con `BACKOFFICE_ADMIN_ROLE_ID` autorizado pueden entrar.
+4. WorkerHub crea una sesion web minima y habilita el monitor.
+
+Fallbacks:
+
+- `WORKERHUB_OPERATIONS_TOKEN`: solo para soporte o automatizacion.
+- `WORKERHUB_ALLOW_LOCAL_BYPASS=true`: solo desarrollo local/testing.
 
 ## Sockets y monitoreo en tiempo real
 
@@ -169,7 +191,15 @@ Si necesitas escalar contenedores automaticamente, el siguiente paso serio es `K
 - `PUSHER_HOST=echo-server`
 - `PUSHER_PORT=6001`
 - `WORKERHUB_OPERATIONS_TOKEN`
-- `WORKERHUB_OPERATIONS_ALLOWED_EMAILS`
+- `WORKERHUB_ALLOW_TOKEN_FALLBACK`
+- `WORKERHUB_ALLOW_LOCAL_BYPASS`
+- `WORKERHUB_DEAD_LETTERS_ALERT_THRESHOLD`
+- `BACKOFFICE_BASE_URL`
+- `BACKOFFICE_AUTH_ENDPOINT`
+- `BACKOFFICE_HEALTH_ENDPOINT`
+- `BACKOFFICE_AUTH_TIMEOUT`
+- `BACKOFFICE_ADMIN_ROLE_ID`
+- `BACKOFFICE_SHARED_TOKEN`
 - `EPSA_SIESA_*` para credenciales y configuracion de importacion a Siesa
 
 ## Nota sobre epsa_library
@@ -191,6 +221,7 @@ Este flujo agrega tablas para monitoreo:
 - Desarrollo SQL Server: `docs/WORKERHUB_SQLSERVER_DEV.md`
 - Sockets y monitoreo real time: `docs/WORKERHUB_SOCKETS.md`
 - Operacion y replay manual: `docs/WORKERHUB_OPERATIONS.md`
+- Auth productiva contra backoffice: `docs/WORKERHUB_AUTH_BACKOFFICE.md`
 - API docs con Doctum:
 
 ```bash

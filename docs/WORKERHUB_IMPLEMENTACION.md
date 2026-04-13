@@ -16,6 +16,8 @@
 - Se agrego replay por lote, topic Kafka dedicado para dead letters y middleware de proteccion operativa.
 - Se agrego auditoria persistente de acciones operativas y export JSON de dead letters.
 - Se agregaron filtros operativos extendidos, export de tareas/auditoria, retry filtrado y lineage de replays.
+- Se agrego autenticacion productiva en WorkerHub delegada a `backoffice_service` con sesion web propia y fallback tecnico auditado.
+- Se agregaron healthchecks operativos para SQL Server, Redis, Kafka, backoffice auth y umbral de dead letters.
 
 3) Logica de negocio
 
@@ -31,6 +33,8 @@
 - Toda accion operativa relevante sobre el monitor queda auditada en `worker_operation_logs`.
 - Las operaciones batch deben respetar el conjunto filtrado actual del monitor.
 - La trazabilidad de replay se conserva via `parent_task_id` y se expone como lineage.
+- El acceso principal al monitor requiere validacion remota contra `backoffice_service`.
+- Solo usuarios activos con rol administrador configurado (`20` por default) pueden abrir sesion.
 
 4) Alcance
 
@@ -82,8 +86,13 @@
 - `MonitorTaskFilters`
 - `OperationLogFilters`
 - `EnsureWorkerHubOperatorAccess`
+- `BackofficeAuthHttpClient`
+- `WorkerHubSessionController`
+- `WorkerHubOperatorSessionManager`
+- `WorkerHubHealthService`
 - Flujo de datos (fuente-> procesamiento-> almacenamiento -> consumidores)
 - Cliente -> API Laravel -> Kafka -> Redis/Horizon -> servicio de negocio -> SQL Server + Kafka results/failures + sockets + notificaciones
+- Operador -> WorkerHub login -> backoffice_service -> sesion web -> monitor operativo
 
 7) Backend
 
@@ -98,6 +107,8 @@
 - Docker stack
 - Broadcasting por sockets
 - Publicacion Kafka a dead letters
+- Login web propio con validacion remota de operadores
+- Healthchecks operativos y comando `workerhub:healthcheck`
 - Casos de error y soluciones
 - Mensaje Kafka invalido: se marca como rechazado y se publica evento de fallo
 - Fallo de negocio en job: se marca fallido y se notifica
@@ -157,7 +168,15 @@
 - `HORIZON_ALLOWED_EMAILS`
 - `PUSHER_*`
 - `WORKERHUB_OPERATIONS_TOKEN`
-- `WORKERHUB_OPERATIONS_ALLOWED_EMAILS`
+- `WORKERHUB_ALLOW_TOKEN_FALLBACK`
+- `WORKERHUB_ALLOW_LOCAL_BYPASS`
+- `WORKERHUB_DEAD_LETTERS_ALERT_THRESHOLD`
+- `BACKOFFICE_BASE_URL`
+- `BACKOFFICE_AUTH_ENDPOINT`
+- `BACKOFFICE_HEALTH_ENDPOINT`
+- `BACKOFFICE_AUTH_TIMEOUT`
+- `BACKOFFICE_ADMIN_ROLE_ID`
+- `BACKOFFICE_SHARED_TOKEN`
 - Plan de difusion
 - habilitar primero en ambiente interno y luego conectar aplicaciones productoras
 
@@ -173,6 +192,8 @@
 - replay manual desde panel web y API
 - Seguridad
 - middleware de operador para panel y endpoints de monitoreo
+- health endpoint con degradacion por dependencias criticas
+- auditoria de login, logout, denegaciones y uso de token fallback
 
 15) Riesgos y mitigaciones
 

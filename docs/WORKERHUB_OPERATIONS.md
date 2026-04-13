@@ -242,13 +242,18 @@ La DLQ ya publica en el topic Kafka dedicado configurado en `KAFKA_TOPIC_DEAD_LE
 
 El panel y los endpoints de monitor usan middleware `workerhub.operator`.
 
-Formas de acceso:
+Canales de acceso soportados:
 
-- usuario autenticado cuyo email exista en `WORKERHUB_OPERATIONS_ALLOWED_EMAILS`
-- token compartido en header `X-WorkerHub-Token`
-- token compartido en query string `?token=...` para el panel web
+- `web_session`: acceso principal. Requiere login propio en WorkerHub y validacion remota en `backoffice_service`.
+- `token_operator`: fallback tecnico mediante header `X-WorkerHub-Token` o query `?token=...`.
+- `local_bypass`: solo desarrollo/testing cuando `WORKERHUB_ALLOW_LOCAL_BYPASS=true` y no hay token tecnico configurado.
 
-Si no configuras token ni usuarios permitidos, solo el ambiente `local` queda abierto por conveniencia de desarrollo.
+Reglas:
+
+- la autoridad de acceso es `backoffice_service`
+- el rol requerido se controla con `BACKOFFICE_ADMIN_ROLE_ID` y por defecto es `20`
+- si backoffice no responde, WorkerHub niega acceso
+- el token tecnico debe tratarse como excepcion operativa y queda auditado
 
 ## Auditoria operativa
 
@@ -269,3 +274,9 @@ Acciones auditadas en esta etapa:
 - `task.retry`
 - `task.retry_batch`
 - `task.retry_filtered`
+- `auth.login.success`
+- `auth.login.failed`
+- `auth.login.denied`
+- `auth.logout`
+- `auth.access.denied`
+- `auth.token_fallback.used`

@@ -2,6 +2,10 @@
 
 namespace App\Providers;
 
+use App\Contracts\BackofficeAuthClientInterface;
+use App\Services\Auth\BackofficeAuthHttpClient;
+use App\Services\Auth\WorkerHubOperatorSessionManager;
+use App\Services\Health\WorkerHubHealthService;
 use App\Services\Kafka\KafkaConfigFactory;
 use App\Services\Kafka\KafkaMessageProducer;
 use App\Services\Kafka\WorkerTaskConsumer;
@@ -20,6 +24,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
+        $this->app->singleton(BackofficeAuthClientInterface::class, BackofficeAuthHttpClient::class);
+        $this->app->singleton(WorkerHubOperatorSessionManager::class);
+        $this->app->singleton(WorkerHubHealthService::class);
         $this->app->singleton(KafkaConfigFactory::class);
         $this->app->singleton(KafkaMessageProducer::class);
         $this->app->singleton(DocumentMigrationService::class);

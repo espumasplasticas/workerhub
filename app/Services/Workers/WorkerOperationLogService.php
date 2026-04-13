@@ -21,7 +21,7 @@ class WorkerOperationLogService
             'action' => $action,
             'status' => $status,
             'actor' => $this->resolveActor($request),
-            'channel' => $request->is('api/*') ? 'api' : 'web',
+            'channel' => $this->resolveChannel($request),
             'worker_task_id' => $taskId,
             'context' => $context,
         ]);
@@ -62,6 +62,18 @@ class WorkerOperationLogService
 
     private function resolveActor(Request $request): ?string
     {
+        $attributeActor = $request->attributes->get('workerhub_actor');
+        if (is_string($attributeActor) && $attributeActor !== '') {
+            return $attributeActor;
+        }
+
+        if ($request->hasSession()) {
+            $sessionOperator = $request->session()->get(config('workerhub.backoffice.session_key', 'workerhub.operator'));
+            if (is_array($sessionOperator) && !empty($sessionOperator['email'])) {
+                return (string) $sessionOperator['email'];
+            }
+        }
+
         $user = $request->user();
         if ($user !== null) {
             return $user->email;
@@ -72,6 +84,20 @@ class WorkerOperationLogService
         }
 
         return null;
+    }
+
+    private function resolveChannel(Request $request): string
+    {
+        $attributeChannel = $request->attributes->get('workerhub_access_channel');
+        if (is_string($attributeChannel) && $attributeChannel !== '') {
+            return $attributeChannel;
+        }
+
+        if ($request->header('X-WorkerHub-Token') !== null || $request->query('token') !== null) {
+            return 'token_operator';
+        }
+
+        return $request->is('api/*') ? 'api' : 'web';
     }
 
     private function queryLogs(OperationLogFilters $filters): Builder

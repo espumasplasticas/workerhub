@@ -68,12 +68,25 @@
             <div class="eyebrow">WorkerHub Operations</div>
             <h1>Monitor operativo de colas, replay y DLQ</h1>
             <p class="lead">Vista central para tareas en Kafka, encolamiento Redis/Horizon y migraciones documentales a Siesa. El panel usa la API de monitoreo y se actualiza por polling con aceleracion via sockets cuando estan disponibles.</p>
+            <p class="hint" style="margin-top:14px;">
+                Canal de acceso: <strong id="access-channel">{{ $accessChannel ?? 'web' }}</strong>
+                @if (is_array($operator ?? null))
+                    | Operador: <strong>{{ $operator['name'] ?? $operator['email'] ?? 'sesion activa' }}</strong>
+                @endif
+            </p>
+            @if (($accessChannel ?? 'web') === 'web_session')
+                <form method="post" action="{{ route('workerhub.logout') }}" style="margin-top:16px;">
+                    @csrf
+                    <button type="submit" style="border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:10px 14px; cursor:pointer;">Cerrar sesion</button>
+                </form>
+            @endif
         </article>
         <aside class="panel status-box">
             <div class="status-dot">Estado en tiempo real</div>
             <div>
                 <div class="metric-value" id="socket-state">Polling</div>
                 <div class="metric-subtle" id="socket-detail">Esperando configuracion de socket...</div>
+                <div class="metric-subtle" id="health-detail" style="margin-top:12px;">Health operativo pendiente...</div>
             </div>
         </aside>
     </section>
@@ -214,6 +227,7 @@ const nodes = {
     openApiButton: document.getElementById('open-api-button'),
     socketState: document.getElementById('socket-state'),
     socketDetail: document.getElementById('socket-detail'),
+    healthDetail: document.getElementById('health-detail'),
     filterSummary: document.getElementById('filter-summary'),
 };
 const filterInputs = {
@@ -463,6 +477,18 @@ async function refreshSummary() {
     });
 }
 
+async function refreshHealth() {
+    try {
+        const payload = await fetchJson(`/api/health/workerhub?${buildTokenQuery().toString()}`);
+        const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
+        nodes.healthDetail.textContent = alerts.length === 0
+            ? `Health ${payload.status}: sin alertas operativas.`
+            : `Health ${payload.status}: ${alerts.join(' | ')}`;
+    } catch (error) {
+        nodes.healthDetail.textContent = `Health degradado: ${error.message}`;
+    }
+}
+
 async function refreshTasks(keepSelection = false) {
     const params = buildTaskParams();
     params.set('silent', '1');
@@ -636,7 +662,7 @@ async function setupSockets() {
 }
 
 async function refreshAll(keepSelection = false) {
-    await Promise.all([refreshSummary(), refreshTasks(keepSelection), refreshActions()]);
+    await Promise.all([refreshSummary(), refreshTasks(keepSelection), refreshActions(), refreshHealth()]);
 }
 
 async function boot() {

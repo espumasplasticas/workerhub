@@ -44,10 +44,26 @@ return [
 
     'operations' => [
         'access_token' => env('WORKERHUB_OPERATIONS_TOKEN', ''),
+        'allow_token_fallback' => filter_var(env('WORKERHUB_ALLOW_TOKEN_FALLBACK', true), FILTER_VALIDATE_BOOL),
+        'allow_local_bypass' => filter_var(env('WORKERHUB_ALLOW_LOCAL_BYPASS', true), FILTER_VALIDATE_BOOL),
         'allowed_emails' => array_values(array_filter(array_map(
             'trim',
             explode(',', (string) env('WORKERHUB_OPERATIONS_ALLOWED_EMAILS', ''))
         ))),
+    ],
+
+    'backoffice' => [
+        'base_url' => rtrim((string) env('BACKOFFICE_BASE_URL', ''), '/'),
+        'auth_endpoint' => env('BACKOFFICE_AUTH_ENDPOINT', '/api/internal/workerhub/operators/authenticate'),
+        'health_endpoint' => env('BACKOFFICE_HEALTH_ENDPOINT', '/api/internal/workerhub/operators/health'),
+        'auth_timeout' => (float) env('BACKOFFICE_AUTH_TIMEOUT', 5),
+        'admin_role_id' => (int) env('BACKOFFICE_ADMIN_ROLE_ID', 20),
+        'shared_token' => env('BACKOFFICE_SHARED_TOKEN', ''),
+        'session_key' => env('WORKERHUB_OPERATOR_SESSION_KEY', 'workerhub.operator'),
+    ],
+
+    'health' => [
+        'dead_letters_alert_threshold' => (int) env('WORKERHUB_DEAD_LETTERS_ALERT_THRESHOLD', 25),
     ],
 
     'notifications' => [
