@@ -25,8 +25,8 @@
 
 ## Servicios
 
-- API Laravel: `http://localhost:8080`
-- Horizon: `http://localhost:8080/horizon`
+- API Laravel: `http://localhost:5010`
+- Horizon: `http://localhost:5010/horizon`
 - Redpanda Console: `http://localhost:8081`
 - Echo Server / Socket.IO: `http://localhost:6001`
 - Kafka externo: `localhost:19092`
@@ -127,8 +127,8 @@ Cada tarea queda registrada en base de datos con historial de eventos para que L
 
 ## Consola operativa web
 
-- URL de acceso: `http://localhost:8080/login`
-- URL del monitor: `http://localhost:8080/monitor`
+- URL de acceso: `http://localhost:5010/login`
+- URL del monitor: `http://localhost:5010/monitor`
 - Funciones:
   - resumen de estados,
   - filtros por tipo, estado, origen, prioridad, queue, fechas, replay y error,
@@ -227,3 +227,32 @@ Este flujo agrega tablas para monitoreo:
 ```bash
 php vendor/bin/doctum.php update doctum.php
 ```
+
+## Ver el proyecto en navegador
+
+### Opcion Docker
+
+1. Configura `APP_PORT=5010` en `.env.docker` o `.env`.
+2. Levanta el stack:
+
+```bash
+docker compose up -d --build
+```
+
+3. Abre:
+
+- `http://localhost:5010/login`
+- `http://localhost:5010/monitor`
+
+### Opcion sin Docker
+
+Si solo quieres ver la UI y validar el login/monitor rapidamente:
+
+```bash
+php artisan serve --host=127.0.0.1 --port=5010
+```
+
+Luego abre:
+
+- `http://127.0.0.1:5010/login`
+- `http://127.0.0.1:5010/monitor`
