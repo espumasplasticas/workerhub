@@ -14,6 +14,7 @@
 - Se dockerizo el proyecto con Nginx, dos instancias PHP, Redpanda, Redis, Echo Server, Horizon y scheduler conectando a SQL Server externo.
 - Se agrego una consola operativa web con replay manual y bandeja logica de DLQ.
 - Se agrego replay por lote, topic Kafka dedicado para dead letters y middleware de proteccion operativa.
+- Se agrego auditoria persistente de acciones operativas y export JSON de dead letters.
 
 3) Logica de negocio
 
@@ -26,6 +27,7 @@
 - Los cambios de estado tambien se emiten por sockets para monitores en tiempo real.
 - Las tareas `failed` y `rejected` pueden reencolarse manualmente preservando trazabilidad padre-hijo.
 - Los rechazos y fallos terminales se publican tambien en el topic de dead letters.
+- Toda accion operativa relevante sobre el monitor queda auditada en `worker_operation_logs`.
 
 4) Alcance
 
@@ -73,6 +75,7 @@
 - `WorkerTaskReplayService`
 - `DocumentMigrationService`
 - `WorkerOperationsDashboardController`
+- `WorkerOperationLogService`
 - `EnsureWorkerHubOperatorAccess`
 - Flujo de datos (fuente-> procesamiento-> almacenamiento -> consumidores)
 - Cliente -> API Laravel -> Kafka -> Redis/Horizon -> servicio de negocio -> SQL Server + Kafka results/failures + sockets + notificaciones
@@ -85,6 +88,7 @@
 - Job de despacho
 - Servicios de monitoreo y notificaciones
 - Servicio de replay operativo
+- Servicio de auditoria operativa
 - Docker stack
 - Broadcasting por sockets
 - Publicacion Kafka a dead letters
@@ -99,6 +103,7 @@
 - `worker_tasks`
 - `worker_task_events`
 - `notifications`
+- `worker_operation_logs`
 - Campos nuevos
 - `parent_task_id`
 - `replayed_at`
@@ -114,6 +119,8 @@
 - monitor de tareas
 - notificacion por fallo
 - ingreso de tarea y resumen del monitor
+- export de dead letters
+- auditoria de operaciones
 - Como verificar manualmente:
 - publicar una tarea en `/api/worker-tasks`
 - validar registro en `worker_tasks`
@@ -122,6 +129,8 @@
 - suscribirse al canal `workerhub.monitor`
 - reencolar una tarea terminal desde `/api/monitor/tasks/{taskId}/retry`
 - reencolar varias tareas desde `/api/monitor/tasks/retry-batch`
+- exportar dead letters desde `/api/monitor/dead-letters/export`
+- revisar historial reciente desde `/api/monitor/actions`
 
 13) Despliegue y puesta en marcha
 

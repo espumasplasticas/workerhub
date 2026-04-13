@@ -45,7 +45,7 @@
         .metric-value { font-size: 38px; margin: 10px 0 6px; }
         .metric-subtle { color: var(--muted); font-size: 14px; }
         .workspace { display: grid; grid-template-columns: 1.7fr 1fr; gap: 20px; }
-        .toolbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto auto; gap: 10px; padding: 18px; border-bottom: 1px solid var(--line); }
+        .toolbar { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)) auto auto auto; gap: 10px; padding: 18px; border-bottom: 1px solid var(--line); }
         .toolbar input, .toolbar select, .toolbar button, .actions button {
             border: 1px solid var(--line);
             border-radius: 12px;
@@ -144,6 +144,7 @@
                     <option value="dead_letters">Solo DLQ</option>
                 </select>
                 <button id="refresh-button" type="button">Actualizar</button>
+                <button id="export-dead-letters-button" class="secondary" type="button">Exportar DLQ</button>
                 <button id="retry-batch-button" class="secondary" type="button">Retry lote</button>
             </div>
             <div class="table-wrap">
@@ -181,6 +182,10 @@
                 <div class="eyebrow">Eventos</div>
                 <div id="detail-events" class="hint">Sin datos.</div>
             </div>
+            <div class="stream">
+                <div class="eyebrow">Acciones operativas</div>
+                <div id="detail-actions" class="hint">Sin datos.</div>
+            </div>
         </aside>
     </section>
 </div>
@@ -193,6 +198,7 @@ window.workerhubOperatorToken = @json($operatorToken ?? '');
 const state = {
     filters: { status: '', type: '', source: '', mode: 'all' },
     tasks: [],
+    actions: [],
     selectedTaskId: null,
     selectedIds: new Set(),
     echo: null,
@@ -205,22 +211,42 @@ const nodes = {
     detailSubtitle: document.getElementById('detail-subtitle'),
     detailGrid: document.getElementById('detail-grid'),
     detailEvents: document.getElementById('detail-events'),
+    detailActions: document.getElementById('detail-actions'),
     detailError: document.getElementById('detail-error'),
     retryButton: document.getElementById('retry-button'),
     retryBatchButton: document.getElementById('retry-batch-button'),
+    exportDeadLettersButton: document.getElementById('export-dead-letters-button'),
     openApiButton: document.getElementById('open-api-button'),
     socketState: document.getElementById('socket-state'),
     socketDetail: document.getElementById('socket-detail'),
 };
 
 document.getElementById('refresh-button').addEventListener('click', () => refreshAll(true));
-document.getElementById('filter-status').addEventListener('change', event => { state.filters.status = event.target.value; refreshTasks(true); });
-document.getElementById('filter-type').addEventListener('change', event => { state.filters.type = event.target.value; refreshTasks(true); });
-document.getElementById('filter-source').addEventListener('input', event => { state.filters.source = event.target.value.trim(); refreshTasks(true); });
-document.getElementById('filter-mode').addEventListener('change', event => { state.filters.mode = event.target.value; refreshTasks(true); });
+document.getElementById('filter-status').addEventListener('change', event => {
+    state.filters.status = event.target.value;
+    refreshTasks(true);
+});
+document.getElementById('filter-type').addEventListener('change', event => {
+    state.filters.type = event.target.value;
+    refreshTasks(true);
+});
+document.getElementById('filter-source').addEventListener('input', event => {
+    state.filters.source = event.target.value.trim();
+    refreshTasks(true);
+});
+document.getElementById('filter-mode').addEventListener('change', event => {
+    state.filters.mode = event.target.value;
+    refreshTasks(true);
+});
+nodes.exportDeadLettersButton.addEventListener('click', () => {
+    const suffix = window.workerhubOperatorToken ? `?token=${encodeURIComponent(window.workerhubOperatorToken)}` : '';
+    window.open(`/api/monitor/dead-letters/export${suffix}`, '_blank');
+});
 
 nodes.retryButton.addEventListener('click', async () => {
-    if (!state.selectedTaskId) return;
+    if (!state.selectedTaskId) {
+        return;
+    }
 
     nodes.retryButton.disabled = true;
     nodes.detailError.textContent = '';
@@ -274,7 +300,10 @@ nodes.retryBatchButton.addEventListener('click', async () => {
 });
 
 nodes.openApiButton.addEventListener('click', () => {
-    if (!state.selectedTaskId) return;
+    if (!state.selectedTaskId) {
+        return;
+    }
+
     const suffix = window.workerhubOperatorToken ? `?token=${encodeURIComponent(window.workerhubOperatorToken)}` : '';
     window.open(`/api/monitor/tasks/${state.selectedTaskId}${suffix}`, '_blank');
 });
@@ -301,11 +330,13 @@ async function fetchJson(url) {
     if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`);
     }
+
     return response.json();
 }
 
 async function refreshSummary() {
-    const summary = await fetchJson('/api/monitor/tasks/summary');
+    const suffix = window.workerhubOperatorToken ? `?token=${encodeURIComponent(window.workerhubOperatorToken)}` : '';
+    const summary = await fetchJson(`/api/monitor/tasks/summary${suffix}`);
     document.querySelectorAll('[data-key]').forEach(node => {
         node.textContent = summary[node.dataset.key] ?? '0';
     });
@@ -343,6 +374,13 @@ async function refreshTasks(keepSelection = false) {
     } else {
         renderTaskDetail(null);
     }
+}
+
+async function refreshActions() {
+    const suffix = window.workerhubOperatorToken ? `?token=${encodeURIComponent(window.workerhubOperatorToken)}` : '';
+    const payload = await fetchJson(`/api/monitor/actions${suffix}`);
+    state.actions = payload.data || [];
+    renderActionHistory();
 }
 
 function renderTasks() {
@@ -397,6 +435,7 @@ function renderTaskDetail(task) {
         nodes.detailSubtitle.textContent = 'Aqui veras eventos, payload resumido y opciones operativas.';
         nodes.detailGrid.innerHTML = '';
         nodes.detailEvents.innerHTML = '<div class="hint">Sin datos.</div>';
+        nodes.detailActions.innerHTML = '<div class="hint">Sin datos.</div>';
         nodes.retryButton.disabled = true;
         nodes.openApiButton.disabled = true;
         return;
@@ -404,7 +443,7 @@ function renderTaskDetail(task) {
 
     state.selectedTaskId = task.id;
     nodes.detailTitle.textContent = task.id;
-    nodes.detailSubtitle.textContent = `${task.type} · ${task.source || 'sin origen'} · ${task.kafka_topic || 'sin topic'}`;
+    nodes.detailSubtitle.textContent = `${task.type} - ${task.source || 'sin origen'} - ${task.kafka_topic || 'sin topic'}`;
     nodes.retryButton.disabled = !['failed', 'rejected'].includes(task.status);
     nodes.openApiButton.disabled = false;
 
@@ -440,6 +479,27 @@ function renderTaskDetail(task) {
                 <div>${escapeHtml(event.message || 'Sin mensaje')}</div>
             </div>
         `).join('');
+
+    renderActionHistory();
+}
+
+function renderActionHistory() {
+    const actions = state.selectedTaskId
+        ? state.actions.filter(action => !action.worker_task_id || action.worker_task_id === state.selectedTaskId)
+        : state.actions;
+
+    nodes.detailActions.innerHTML = actions.length === 0
+        ? '<div class="hint">No hay acciones operativas recientes para esta vista.</div>'
+        : actions.map(action => `
+            <div class="stream-item">
+                <div class="stream-head">
+                    <span class="stream-event">${escapeHtml(action.action)}</span>
+                    <span class="hint">${escapeHtml(action.created_at || '')}</span>
+                </div>
+                <div>${escapeHtml(action.actor || 'sistema')} - ${escapeHtml(action.status || 'success')}</div>
+                <div class="mono">${escapeHtml(action.worker_task_id || '-')}</div>
+            </div>
+        `).join('');
 }
 
 async function setupSockets() {
@@ -447,7 +507,7 @@ async function setupSockets() {
         const suffix = window.workerhubOperatorToken ? `?token=${encodeURIComponent(window.workerhubOperatorToken)}` : '';
         const config = await fetchJson(`/api/monitor/socket-config${suffix}`);
         nodes.socketState.textContent = 'Sockets activos';
-        nodes.socketDetail.textContent = `${config.host}:${config.port} · ${config.channels.monitor}`;
+        nodes.socketDetail.textContent = `${config.host}:${config.port} - ${config.channels.monitor}`;
 
         if (!window.io || !window.Echo) {
             throw new Error('Echo client no disponible');
@@ -469,7 +529,7 @@ async function setupSockets() {
 }
 
 async function refreshAll(keepSelection = false) {
-    await Promise.all([refreshSummary(), refreshTasks(keepSelection)]);
+    await Promise.all([refreshSummary(), refreshTasks(keepSelection), refreshActions()]);
 }
 
 async function boot() {

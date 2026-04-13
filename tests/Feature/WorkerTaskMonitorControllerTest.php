@@ -87,6 +87,60 @@ class WorkerTaskMonitorControllerTest extends TestCase
             ->assertJsonCount(2, 'data');
     }
 
+    public function test_it_exports_dead_letters_as_json(): void
+    {
+        WorkerTask::query()->create([
+            'id' => 'task-export',
+            'type' => 'document_migration',
+            'source' => 'crm',
+            'status' => 'failed',
+            'priority' => 'high',
+            'payload' => ['document_id' => 'DOC-EXPORT'],
+        ]);
+
+        $response = $this->getJson('/api/monitor/dead-letters/export');
+
+        $response->assertOk()
+            ->assertJson([
+                'count' => 1,
+            ])
+            ->assertJsonPath('items.0.id', 'task-export')
+            ->assertJsonPath('items.0.payload.document_id', 'DOC-EXPORT');
+
+        $this->assertDatabaseHas('worker_operation_logs', [
+            'action' => 'dead_letters.export',
+            'status' => 'success',
+        ]);
+    }
+
+    public function test_it_returns_recent_operation_logs(): void
+    {
+        WorkerTask::query()->create([
+            'id' => 'task-actions',
+            'type' => 'document_migration',
+            'status' => 'failed',
+            'priority' => 'default',
+        ]);
+
+        $this->getJson('/api/monitor/tasks/task-actions')->assertOk();
+
+        $response = $this->getJson('/api/monitor/actions');
+
+        $response->assertOk();
+
+        $this->assertTrue(
+            collect($response->json('data'))->contains(
+                fn (array $item): bool => $item['action'] === 'monitor.tasks.show' && $item['worker_task_id'] === 'task-actions'
+            )
+        );
+
+        $this->assertTrue(
+            collect($response->json('data'))->contains(
+                fn (array $item): bool => $item['action'] === 'monitor.actions.index'
+            )
+        );
+    }
+
     public function test_it_replays_a_failed_task_and_creates_a_child_task(): void
     {
         $producer = Mockery::mock(KafkaMessageProducer::class);
@@ -129,6 +183,12 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'worker_task_id' => 'task-dead-letter',
             'event' => 'task.replayed',
         ]);
+
+        $this->assertDatabaseHas('worker_operation_logs', [
+            'action' => 'task.retry',
+            'status' => 'success',
+            'worker_task_id' => 'task-dead-letter',
+        ]);
     }
 
     public function test_it_replays_multiple_failed_tasks_in_batch(): void
@@ -164,5 +224,10 @@ class WorkerTaskMonitorControllerTest extends TestCase
             ]);
 
         $this->assertSame(2, WorkerTask::query()->whereNotNull('parent_task_id')->count());
+
+        $this->assertDatabaseHas('worker_operation_logs', [
+            'action' => 'task.retry_batch',
+            'status' => 'success',
+        ]);
     }
 }

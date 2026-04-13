@@ -8,6 +8,7 @@ use App\Services\Kafka\WorkerTaskConsumer;
 use App\Services\Workers\DocumentMigrationService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskNotificationService;
+use App\Services\Workers\WorkerOperationLogService;
 use App\Services\Workers\WorkerTaskReplayService;
 use App\Services\Workers\WorkerTaskRouter;
 use Illuminate\Support\ServiceProvider;
@@ -24,6 +25,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DocumentMigrationService::class);
         $this->app->singleton(WorkerTaskNotificationService::class);
         $this->app->singleton(WorkerTaskMonitorService::class);
+        $this->app->singleton(WorkerOperationLogService::class);
         $this->app->singleton(WorkerTaskReplayService::class);
         $this->app->singleton(WorkerTaskRouter::class);
         $this->app->singleton(WorkerTaskConsumer::class);

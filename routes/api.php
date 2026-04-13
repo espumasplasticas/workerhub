@@ -29,6 +29,8 @@ Route::middleware('workerhub.operator')->group(function () {
     Route::get('/monitor/tasks', [WorkerTaskMonitorController::class, 'index']);
     Route::get('/monitor/tasks/summary', [WorkerTaskMonitorController::class, 'summary']);
     Route::get('/monitor/dead-letters', [WorkerTaskMonitorController::class, 'deadLetters']);
+    Route::get('/monitor/dead-letters/export', [WorkerTaskMonitorController::class, 'exportDeadLetters']);
+    Route::get('/monitor/actions', [WorkerTaskMonitorController::class, 'actions']);
     Route::get('/monitor/socket-config', [WorkerTaskMonitorController::class, 'socketConfig']);
     Route::post('/monitor/tasks/retry-batch', [WorkerTaskMonitorController::class, 'retryBatch']);
     Route::post('/monitor/tasks/{taskId}/retry', [WorkerTaskMonitorController::class, 'retry']);
