@@ -1,0 +1,174 @@
+services:
+  nginx:
+    image: workerhub-nginx:local
+    build:
+      context: .
+      dockerfile: docker/nginx/Dockerfile
+    ports:
+      - "${APP_PORT:-8080}:80"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - php-1
+      - php-2
+      - echo-server
+    networks:
+      - workerhub
+
+  php-1:
+    image: workerhub-php:local
+    build:
+      context: .
+      dockerfile: docker/php/Dockerfile
+    env_file:
+      - .env.docker
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - workerhub
+
+  php-2:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - workerhub
+
+  horizon:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan migrate --force &&
+      php artisan horizon"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - workerhub
+
+  kafka-consumer:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan migrate --force &&
+      php artisan kafka:consume-worker-tasks"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - workerhub
+
+  scheduler:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan migrate --force &&
+      php artisan schedule:work"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    networks:
+      - workerhub
+
+  echo-server:
+    image: workerhub-echo:local
+    build:
+      context: .
+      dockerfile: docker/echo_server.dockerfile
+    env_file:
+      - .env.docker
+    ports:
+      - "${ECHO_SERVER_PORT_FORWARD:-6001}:6001"
+    depends_on:
+      - redis
+    networks:
+      - workerhub
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "${REDIS_FORWARD_PORT:-6381}:6379"
+    volumes:
+      - workerhub-redis:/data
+    networks:
+      - workerhub
+
+  redpanda:
+    image: docker.redpanda.com/redpandadata/redpanda:v24.3.8
+    command:
+      - redpanda
+      - start
+      - --overprovisioned
+      - --smp
+      - "1"
+      - --memory
+      - 1G
+      - --reserve-memory
+      - 0M
+      - --node-id
+      - "0"
+      - --check=false
+      - --kafka-addr
+      - internal://0.0.0.0:9092,external://0.0.0.0:19092
+      - --advertise-kafka-addr
+      - internal://redpanda:9092,external://localhost:19092
+      - --pandaproxy-addr
+      - internal://0.0.0.0:8082
+      - --advertise-pandaproxy-addr
+      - internal://redpanda:8082
+      - --set
+      - redpanda.auto_create_topics_enabled=true
+    ports:
+      - "${KAFKA_FORWARD_PORT:-19092}:19092"
+      - "${PANDAPROXY_FORWARD_PORT:-18082}:8082"
+    volumes:
+      - workerhub-redpanda:/var/lib/redpanda/data
+    networks:
+      - workerhub
+
+  redpanda-console:
+    image: docker.redpanda.com/redpandadata/console:v2.7.2
+    environment:
+      KAFKA_BROKERS: redpanda:9092
+      KAFKA_SCHEMAREGISTRY_ENABLED: "false"
+      REDPANDA_ADMINAPI_ENABLED: "false"
+    ports:
+      - "${KAFKA_CONSOLE_PORT:-8081}:8080"
+    depends_on:
+      - redpanda
+    networks:
+      - workerhub
+
+volumes:
+  workerhub-redis:
+  workerhub-redpanda:
+
+networks:
+  workerhub:
