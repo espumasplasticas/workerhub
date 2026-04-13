@@ -217,6 +217,13 @@ Si necesitas escalar contenedores automaticamente, el siguiente paso serio es `K
 
 `WorkerHub` ya esta preparado para resolver `Epsalibrary\Contracts\ImportManagerInterface` desde Laravel y usarlo dentro del job `document_migration`. Solo falta completar las variables `EPSA_SIESA_*` reales del ambiente donde importaras.
 
+El healthcheck operativo ahora valida tambien la configuracion SOAP de `epsa_library`. Mientras falten estas variables, `GET /api/health/workerhub` y `php artisan workerhub:healthcheck --json` reportaran `degraded`:
+
+- `EPSA_SIESA_SOAP_URL`
+- `EPSA_SIESA_SOAP_USER`
+- `EPSA_SIESA_SOAP_PASSWORD`
+- `EPSA_SIESA_SOAP_CONNECTION`
+
 ## Validacion local cerrada
 
 Flujo validado en desarrollo:

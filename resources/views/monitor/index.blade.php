@@ -20,10 +20,13 @@
             --danger-soft:rgba(199,59,85,.12);
             --success:#138a63;
             --success-soft:rgba(19,138,99,.12);
+            --info:#2460c5;
+            --info-soft:rgba(36,96,197,.1);
             --line:rgba(26,90,176,.14);
             --shadow:0 26px 60px rgba(13,53,120,.12);
         }
         * { box-sizing:border-box; }
+        html, body { overflow-x:hidden; }
         body {
             margin:0;
             font-family:"Manrope","Segoe UI",sans-serif;
@@ -33,7 +36,7 @@
                 radial-gradient(circle at top right, rgba(82,146,255,.18), transparent 22%),
                 linear-gradient(180deg, #f7fbff 0%, var(--bg) 100%);
         }
-        .shell { max-width:1480px; margin:0 auto; padding:32px 20px 48px; }
+        .shell { width:min(1680px, calc(100vw - 32px)); margin:0 auto; padding:26px 0 42px; }
         .topbar { margin-bottom:18px; }
         .topbar-card {
             display:flex;
@@ -100,31 +103,32 @@
             border-left:1px solid var(--line);
             color:var(--muted);
             font-size:13px;
+            min-width:180px;
         }
         .operator-chip strong { display:block; color:var(--ink); }
-        .hero { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:24px; }
+        .hero { display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(320px, .8fr); gap:18px; margin-bottom:22px; align-items:stretch; }
         .panel { background:var(--panel); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
         .headline { padding:28px; }
         .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:12px; color:var(--muted); margin-bottom:10px; font-weight:700; }
-        h1 { margin:0 0 10px; font-size:44px; line-height:.95; font-family:"Instrument Sans","Segoe UI",sans-serif; }
+        h1 { margin:0 0 12px; font-size:42px; line-height:.98; font-family:"Instrument Sans","Segoe UI",sans-serif; max-width:10ch; }
         .lead { margin:0; color:var(--muted); font-size:17px; line-height:1.6; }
         .status-box { padding:24px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(145deg, rgba(13,98,214,.10), rgba(255,255,255,.96)); }
         .status-dot { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
         .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 6px rgba(13,98,214,.10); }
-        .cards { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:14px; margin-bottom:24px; }
-        .metric { padding:18px; min-height:120px; background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(245,249,255,.84)); }
+        .cards { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:14px; margin-bottom:20px; }
+        .metric { padding:18px; min-height:116px; background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(245,249,255,.84)); }
         .metric-label { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
         .metric-value { font-size:38px; margin:10px 0 6px; }
         .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:14px; }
-        .workspace { display:grid; grid-template-columns:1.8fr 1fr; gap:20px; }
+        .workspace { display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(380px, .9fr); gap:18px; align-items:start; }
         .toolbar { display:grid; gap:10px; padding:18px; }
         .toolbar.primary, .toolbar.secondary { grid-template-columns:repeat(5, minmax(0,1fr)); border-bottom:1px solid var(--line); }
-        .toolbar.actions { grid-template-columns:repeat(6, minmax(0,1fr)); }
+        .toolbar.actions { grid-template-columns:repeat(4, minmax(0,1fr)); }
         .toolbar input, .toolbar select, .toolbar button, .actions button { border:1px solid var(--line); border-radius:14px; padding:12px 14px; font:inherit; background:#fff; color:var(--ink); }
         .toolbar button, .actions button { background:var(--accent); border-color:var(--accent); color:#fff; cursor:pointer; }
         .toolbar button.secondary, .actions button.secondary { background:#fff; color:var(--ink); border-color:var(--line); }
         .toolbar-summary { padding:0 18px 18px; border-bottom:1px solid var(--line); }
-        .table-wrap { overflow:auto; max-height:720px; }
+        .table-wrap { overflow:auto; max-height:760px; }
         table { width:100%; border-collapse:collapse; }
         th, td { padding:14px 18px; text-align:left; border-bottom:1px solid rgba(26,90,176,.10); vertical-align:top; }
         th { position:sticky; top:0; background:var(--panel); font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
@@ -137,11 +141,16 @@
         .badge.high { background:var(--warn-soft); color:var(--warn); }
         .mono { font-family:Consolas, Monaco, monospace; font-size:12px; }
         .checkbox { width:16px; height:16px; accent-color:var(--accent); }
-        .detail { padding:22px; }
+        .detail { padding:22px; position:sticky; top:18px; }
         .detail h2 { margin-top:0; font-size:26px; }
         .detail-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; margin-bottom:18px; }
-        .detail-card { padding:14px; border-radius:16px; border:1px solid var(--line); background:#fff; }
+        .detail-card { padding:14px; border-radius:16px; border:1px solid var(--line); background:#fff; min-width:0; }
+        .detail-card.full { grid-column:1 / -1; }
         .detail-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px; }
+        .detail-value { font-size:15px; font-weight:600; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
+        .detail-value.code { font-family:Consolas, Monaco, monospace; font-size:12px; font-weight:600; }
+        .detail-value.error { max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:var(--danger-soft); color:#8e2039; }
+        .detail-value.inline-badge { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
         .stream { margin-top:16px; border-top:1px solid var(--line); padding-top:16px; }
         .stream-item { padding:12px 0; border-bottom:1px dashed var(--line); }
         .stream-item:last-child { border-bottom:0; }
@@ -150,8 +159,12 @@
         .empty { padding:36px 20px; text-align:center; color:var(--muted); }
         .lineage-node { border-left:2px solid var(--line); margin:8px 0 0 10px; padding-left:12px; }
         .lineage-node.selected { border-left-color:var(--accent); }
-        @media (max-width:1280px) { .hero, .workspace, .cards { grid-template-columns:1fr; } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-        @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; } }
+        .task-id strong { display:block; font-size:14px; line-height:1.4; }
+        .task-id .mono { display:block; margin-top:4px; color:var(--muted); }
+        .table-actions { display:flex; gap:8px; align-items:center; }
+        @media (max-width:1480px) { .cards { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+        @media (max-width:1280px) { .hero, .workspace { grid-template-columns:1fr; } .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } .detail { position:static; } }
+        @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; min-width:0; } .shell { width:min(100vw - 20px, 100%); } }
         @media (max-width:720px) { h1 { font-size:32px; } .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } }
     </style>
 </head>
@@ -651,7 +664,7 @@ function renderTasks() {
 
     nodes.body.innerHTML = state.tasks.map(task => `
         <tr data-task-id="${escapeHtml(task.id)}">
-            <td><strong>${escapeHtml(task.id)}</strong><br><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
+            <td class="task-id"><strong>${escapeHtml(task.id)}</strong><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
             <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!['failed', 'rejected'].includes(task.status) ? 'disabled' : ''}></td>
             <td><span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span></td>
             <td>${escapeHtml(task.type)}</td>
@@ -715,16 +728,23 @@ function renderTaskDetail(task) {
 
     const replays = Array.isArray(task.replays) ? task.replays.length : 0;
     const payload = task.payload || {};
-    nodes.detailGrid.innerHTML = [
-        ['Estado', `<span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span>`],
-        ['Prioridad', `<span class="${badgeClass(task.priority)}">${escapeHtml(task.priority || 'default')}</span>`],
-        ['Cola', escapeHtml(task.queue || '-')],
-        ['Intentos', escapeHtml(task.attempts ?? 0)],
-        ['Documento', escapeHtml(payload.document_id || '-')],
-        ['Replay count', escapeHtml(replays)],
-        ['Parent task', escapeHtml(task.parent_task_id || '-')],
-        ['Error', escapeHtml(task.error_message || '-')],
-    ].map(([label, value]) => `<div class="detail-card"><div class="detail-label">${label}</div><div>${value}</div></div>`).join('');
+    const detailItems = [
+        { label: 'Estado', value: `<span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span>`, className: 'inline-badge' },
+        { label: 'Prioridad', value: `<span class="${badgeClass(task.priority)}">${escapeHtml(task.priority || 'default')}</span>`, className: 'inline-badge' },
+        { label: 'Cola', value: escapeHtml(task.queue || '-'), className: 'code' },
+        { label: 'Intentos', value: escapeHtml(task.attempts ?? 0) },
+        { label: 'Documento', value: escapeHtml(payload.document_id || '-'), className: 'code' },
+        { label: 'Replay count', value: escapeHtml(replays) },
+        { label: 'Parent task', value: escapeHtml(task.parent_task_id || '-'), className: 'code' },
+        { label: 'Error', value: escapeHtml(task.error_message || '-'), className: 'error', full: true },
+    ];
+
+    nodes.detailGrid.innerHTML = detailItems.map(item => {
+        const cardClass = item.full ? 'detail-card full' : 'detail-card';
+        const valueClass = ['detail-value', item.className].filter(Boolean).join(' ');
+
+        return `<div class="${cardClass}"><div class="detail-label">${item.label}</div><div class="${valueClass}">${item.value}</div></div>`;
+    }).join('');
 
     const events = Array.isArray(task.events) ? task.events : [];
     nodes.detailEvents.innerHTML = events.length === 0
