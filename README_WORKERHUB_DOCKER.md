@@ -130,6 +130,7 @@ Cada tarea queda registrada en base de datos con historial de eventos para que L
 
 - URL de acceso: `http://localhost:5010/login`
 - URL del monitor: `http://localhost:5010/monitor`
+- URL de Horizon: `http://localhost:5010/horizon`
 - Funciones:
   - resumen de estados,
   - filtros por tipo, estado, origen, prioridad, queue, fechas, replay y error,
@@ -148,12 +149,18 @@ WorkerHub ya no usa como mecanismo principal una lista local de correos. El fluj
 1. El operador entra por `/login`.
 2. WorkerHub valida credenciales contra `backoffice_service`.
 3. Solo usuarios activos con `BACKOFFICE_ADMIN_ROLE_ID` autorizado pueden entrar.
-4. WorkerHub crea una sesion web minima y habilita el monitor.
+4. WorkerHub crea una sesion web minima y habilita el monitor y `Horizon`.
 
 Fallbacks:
 
 - `WORKERHUB_OPERATIONS_TOKEN`: solo para soporte o automatizacion.
 - `WORKERHUB_ALLOW_LOCAL_BYPASS=true`: solo desarrollo local/testing.
+
+La misma sesion autenticada se reutiliza en:
+
+- `/monitor`
+- `/api/monitor/*`
+- `/horizon`
 
 ## Sockets y monitoreo en tiempo real
 
@@ -271,6 +278,7 @@ docker compose up -d --build
 
 - `http://localhost:5010/login`
 - `http://localhost:5010/monitor`
+- `http://localhost:5010/horizon`
 
 ### Opcion sin Docker
 
@@ -284,3 +292,4 @@ Luego abre:
 
 - `http://127.0.0.1:5010/login`
 - `http://127.0.0.1:5010/monitor`
+- `http://127.0.0.1:5010/horizon`

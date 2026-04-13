@@ -5,21 +5,114 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>WorkerHub Monitor</title>
     <style>
-        :root { --bg:#f3efe6; --panel:#fffdf8; --ink:#1d2a2f; --muted:#6b7b83; --accent:#0b6e4f; --accent-soft:#d9efe6; --warn:#b95c00; --warn-soft:#ffe3c2; --danger:#a33030; --danger-soft:#f8d9d9; --line:#d9d0c4; --shadow:0 20px 50px rgba(29,42,47,.12); }
+        :root {
+            --bg:#eef5ff;
+            --panel:rgba(255,255,255,.88);
+            --panel-strong:#ffffff;
+            --ink:#10203d;
+            --muted:#5d7298;
+            --accent:#0d62d6;
+            --accent-strong:#0848a2;
+            --accent-soft:rgba(13,98,214,.12);
+            --warn:#b26a12;
+            --warn-soft:rgba(255,184,78,.18);
+            --danger:#c73b55;
+            --danger-soft:rgba(199,59,85,.12);
+            --success:#138a63;
+            --success-soft:rgba(19,138,99,.12);
+            --line:rgba(26,90,176,.14);
+            --shadow:0 26px 60px rgba(13,53,120,.12);
+        }
         * { box-sizing:border-box; }
-        body { margin:0; font-family:Georgia,"Times New Roman",serif; color:var(--ink); background:radial-gradient(circle at top left, rgba(11,110,79,.12), transparent 25%), linear-gradient(180deg, #f8f4ec 0%, var(--bg) 100%); }
+        body {
+            margin:0;
+            font-family:"Manrope","Segoe UI",sans-serif;
+            color:var(--ink);
+            background:
+                radial-gradient(circle at top left, rgba(13,98,214,.18), transparent 28%),
+                radial-gradient(circle at top right, rgba(82,146,255,.18), transparent 22%),
+                linear-gradient(180deg, #f7fbff 0%, var(--bg) 100%);
+        }
         .shell { max-width:1480px; margin:0 auto; padding:32px 20px 48px; }
+        .topbar { margin-bottom:18px; }
+        .topbar-card {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:18px;
+            padding:18px 22px;
+            border:1px solid var(--line);
+            border-radius:24px;
+            background:linear-gradient(145deg, rgba(255,255,255,.92), rgba(244,249,255,.84));
+            box-shadow:var(--shadow);
+            backdrop-filter:blur(16px);
+        }
+        .brand { display:flex; align-items:center; gap:14px; }
+        .brand-mark {
+            width:46px;
+            height:46px;
+            border-radius:15px;
+            background:linear-gradient(145deg, var(--accent), #49a0ff);
+            box-shadow:inset 0 1px 0 rgba(255,255,255,.24);
+        }
+        .brand-copy small {
+            display:block;
+            margin-bottom:4px;
+            color:var(--muted);
+            text-transform:uppercase;
+            letter-spacing:.18em;
+            font-size:11px;
+            font-weight:700;
+        }
+        .brand-copy strong {
+            display:block;
+            font-size:24px;
+            line-height:1;
+            font-family:"Instrument Sans","Segoe UI",sans-serif;
+        }
+        .brand-copy span { color:var(--muted); font-size:13px; }
+        .nav {
+            display:flex;
+            align-items:center;
+            flex-wrap:wrap;
+            gap:10px;
+        }
+        .nav-link, .nav button {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-height:42px;
+            padding:0 16px;
+            border-radius:999px;
+            border:1px solid var(--line);
+            background:#fff;
+            color:var(--ink);
+            text-decoration:none;
+            font:inherit;
+            font-size:13px;
+            font-weight:700;
+            cursor:pointer;
+        }
+        .nav-link.active, .nav-link:hover, .nav button:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+        .operator-chip {
+            margin-left:6px;
+            padding-left:14px;
+            border-left:1px solid var(--line);
+            color:var(--muted);
+            font-size:13px;
+        }
+        .operator-chip strong { display:block; color:var(--ink); }
         .hero { display:grid; grid-template-columns:2fr 1fr; gap:20px; margin-bottom:24px; }
-        .panel { background:var(--panel); border:1px solid rgba(217,208,196,.9); border-radius:22px; box-shadow:var(--shadow); }
+        .panel { background:var(--panel); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
         .headline { padding:28px; }
-        .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:12px; color:var(--muted); margin-bottom:10px; }
-        h1 { margin:0 0 10px; font-size:42px; line-height:1; }
+        .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:12px; color:var(--muted); margin-bottom:10px; font-weight:700; }
+        h1 { margin:0 0 10px; font-size:44px; line-height:.95; font-family:"Instrument Sans","Segoe UI",sans-serif; }
         .lead { margin:0; color:var(--muted); font-size:17px; line-height:1.6; }
-        .status-box { padding:24px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(135deg, rgba(11,110,79,.08), rgba(255,253,248,1)); }
+        .status-box { padding:24px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(145deg, rgba(13,98,214,.10), rgba(255,255,255,.96)); }
         .status-dot { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
-        .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 6px rgba(11,110,79,.08); }
+        .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 6px rgba(13,98,214,.10); }
         .cards { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:14px; margin-bottom:24px; }
-        .metric { padding:18px; min-height:120px; }
+        .metric { padding:18px; min-height:120px; background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(245,249,255,.84)); }
         .metric-label { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
         .metric-value { font-size:38px; margin:10px 0 6px; }
         .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:14px; }
@@ -27,27 +120,27 @@
         .toolbar { display:grid; gap:10px; padding:18px; }
         .toolbar.primary, .toolbar.secondary { grid-template-columns:repeat(5, minmax(0,1fr)); border-bottom:1px solid var(--line); }
         .toolbar.actions { grid-template-columns:repeat(6, minmax(0,1fr)); }
-        .toolbar input, .toolbar select, .toolbar button, .actions button { border:1px solid var(--line); border-radius:12px; padding:12px 14px; font:inherit; background:#fff; color:var(--ink); }
+        .toolbar input, .toolbar select, .toolbar button, .actions button { border:1px solid var(--line); border-radius:14px; padding:12px 14px; font:inherit; background:#fff; color:var(--ink); }
         .toolbar button, .actions button { background:var(--accent); border-color:var(--accent); color:#fff; cursor:pointer; }
         .toolbar button.secondary, .actions button.secondary { background:#fff; color:var(--ink); border-color:var(--line); }
         .toolbar-summary { padding:0 18px 18px; border-bottom:1px solid var(--line); }
         .table-wrap { overflow:auto; max-height:720px; }
         table { width:100%; border-collapse:collapse; }
-        th, td { padding:14px 18px; text-align:left; border-bottom:1px solid rgba(217,208,196,.7); vertical-align:top; }
+        th, td { padding:14px 18px; text-align:left; border-bottom:1px solid rgba(26,90,176,.10); vertical-align:top; }
         th { position:sticky; top:0; background:var(--panel); font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
-        tr:hover td { background:rgba(11,110,79,.03); }
+        tr:hover td { background:rgba(13,98,214,.04); }
         .badge { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; letter-spacing:.04em; }
         .badge.received, .badge.published, .badge.queued, .badge.processing { background:var(--accent-soft); color:var(--accent); }
-        .badge.completed { background:#dff5db; color:#245b1b; }
+        .badge.completed { background:var(--success-soft); color:var(--success); }
         .badge.failed, .badge.rejected { background:var(--danger-soft); color:var(--danger); }
-        .badge.default { background:#ece8df; color:#5a5c58; }
+        .badge.default { background:rgba(96,119,156,.12); color:#4d6186; }
         .badge.high { background:var(--warn-soft); color:var(--warn); }
         .mono { font-family:Consolas, Monaco, monospace; font-size:12px; }
         .checkbox { width:16px; height:16px; accent-color:var(--accent); }
         .detail { padding:22px; }
         .detail h2 { margin-top:0; font-size:26px; }
         .detail-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; margin-bottom:18px; }
-        .detail-card { padding:14px; border-radius:14px; border:1px solid var(--line); background:#fff; }
+        .detail-card { padding:14px; border-radius:16px; border:1px solid var(--line); background:#fff; }
         .detail-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px; }
         .stream { margin-top:16px; border-top:1px solid var(--line); padding-top:16px; }
         .stream-item { padding:12px 0; border-bottom:1px dashed var(--line); }
@@ -58,28 +151,52 @@
         .lineage-node { border-left:2px solid var(--line); margin:8px 0 0 10px; padding-left:12px; }
         .lineage-node.selected { border-left-color:var(--accent); }
         @media (max-width:1280px) { .hero, .workspace, .cards { grid-template-columns:1fr; } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+        @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; } }
         @media (max-width:720px) { h1 { font-size:32px; } .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
 <div class="shell">
+    <section class="topbar">
+        <div class="topbar-card">
+            <div class="brand">
+                <div class="brand-mark"></div>
+                <div class="brand-copy">
+                    <small>Comodísimos Operations</small>
+                    <strong>WorkerHub Monitor</strong>
+                    <span>Colas, replays, lineage y operación diaria en una sola consola.</span>
+                </div>
+            </div>
+            <div class="nav">
+                <a class="nav-link active" href="{{ route('monitor.dashboard') }}">Monitor</a>
+                <a class="nav-link" href="{{ url('/horizon') }}">Horizon</a>
+                @if (is_array($operator ?? null))
+                    <div class="operator-chip">
+                        <strong>{{ $operator['name'] ?? $operator['email'] ?? 'sesion activa' }}</strong>
+                        <span>{{ $operator['email'] ?? ($accessChannel ?? 'web_session') }}</span>
+                    </div>
+                @endif
+                @if (($accessChannel ?? 'web') === 'web_session')
+                    <form method="post" action="{{ route('workerhub.logout') }}" style="margin:0;">
+                        @csrf
+                        <button type="submit">Salir</button>
+                    </form>
+                @endif
+            </div>
+        </div>
+    </section>
     <section class="hero">
         <article class="panel headline">
             <div class="eyebrow">WorkerHub Operations</div>
-            <h1>Monitor operativo de colas, replay y DLQ</h1>
-            <p class="lead">Vista central para tareas en Kafka, encolamiento Redis/Horizon y migraciones documentales a Siesa. El panel usa la API de monitoreo y se actualiza por polling con aceleracion via sockets cuando estan disponibles.</p>
+            <h1>Monitor azul para operación de colas, DLQ y replay.</h1>
+            <p class="lead">Vista central para tareas en Kafka o `direct_queue`, encolamiento Redis/Horizon y migraciones documentales a Siesa. El panel prioriza claridad operativa, lectura rápida y trazabilidad completa por tarea.</p>
             <p class="hint" style="margin-top:14px;">
                 Canal de acceso: <strong id="access-channel">{{ $accessChannel ?? 'web' }}</strong>
                 @if (is_array($operator ?? null))
                     | Operador: <strong>{{ $operator['name'] ?? $operator['email'] ?? 'sesion activa' }}</strong>
                 @endif
             </p>
-            @if (($accessChannel ?? 'web') === 'web_session')
-                <form method="post" action="{{ route('workerhub.logout') }}" style="margin-top:16px;">
-                    @csrf
-                    <button type="submit" style="border:1px solid var(--line); background:#fff; color:var(--ink); border-radius:12px; padding:10px 14px; cursor:pointer;">Cerrar sesion</button>
-                </form>
-            @endif
+            <p class="hint" style="margin-top:12px;">Acceso unificado con backoffice: la misma sesión habilita este monitor y el dashboard de Horizon.</p>
         </article>
         <aside class="panel status-box">
             <div class="status-dot">Estado en tiempo real</div>

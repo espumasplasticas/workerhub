@@ -9,6 +9,7 @@
 
 - WorkerHub deja de depender de listas locales de correos como mecanismo principal de acceso.
 - El panel operativo y los endpoints de monitoreo usan login propio con sesion Laravel.
+- La misma sesion autorizada habilita tambien el acceso a `Horizon`.
 - La autorizacion real se valida por API contra `backoffice_service`.
 - Solo usuarios con rol administrador configurado en backoffice (`admin_role_id = 20`) pueden entrar.
 - El token tecnico se mantiene solo como fallback operativo controlado.
@@ -44,6 +45,7 @@
 - Cambios visibles para el usuario:
 - existe una pantalla `/login`
 - el panel web usa sesion propia
+- `monitor` y `Horizon` quedan unificados bajo la misma sesion
 - operadores no autorizados reciben rechazo explicito
 
 6) Arquitectura y diseno
@@ -64,6 +66,7 @@
 - `WorkerHubOperatorAuthController` en `backoffice_service`
 - Flujo de datos
 - navegador -> WorkerHub login -> backoffice auth API -> sesion local -> monitor/API operativa
+- navegador -> WorkerHub login -> backoffice auth API -> sesion local -> monitor + Horizon
 
 7) Backend
 
@@ -71,6 +74,7 @@
 - `WorkerHub`:
 - auth web
 - middleware de acceso
+- gate de Horizon basado en sesion operativa
 - health operacional
 - Docker healthchecks
 - `backoffice_service`:
@@ -105,7 +109,7 @@
 - configurar `BACKOFFICE_BASE_URL` y `BACKOFFICE_SHARED_TOKEN`
 - abrir `/login`
 - autenticar con un usuario administrador del backoffice
-- entrar al monitor y ejecutar una accion operativa
+- entrar al monitor, abrir `Horizon` y ejecutar una accion operativa
 - validar filas `auth.login.success` y `monitor.view` en `worker_operation_logs`
 - desconectar backoffice y comprobar `GET /api/health/workerhub`
 

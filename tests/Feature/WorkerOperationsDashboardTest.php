@@ -13,7 +13,8 @@ class WorkerOperationsDashboardTest extends TestCase
     {
         $this->get('/')
             ->assertOk()
-            ->assertSee('Monitor operativo de colas, replay y DLQ');
+            ->assertSee('WorkerHub Monitor')
+            ->assertSee('Monitor azul para operación de colas, DLQ y replay.');
 
         $this->assertDatabaseHas('worker_operation_logs', [
             'action' => 'monitor.view',

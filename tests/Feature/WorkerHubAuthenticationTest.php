@@ -47,6 +47,7 @@ class WorkerHubAuthenticationTest extends TestCase
         $this->assertSame('admin@comodisimos.com', session('workerhub.operator.email'));
 
         $this->get('/monitor')->assertOk();
+        $this->get('/horizon')->assertOk();
 
         $this->assertDatabaseHas('worker_operation_logs', [
             'action' => 'auth.login.success',
@@ -129,5 +130,13 @@ class WorkerHubAuthenticationTest extends TestCase
             'action' => 'auth.access.denied',
             'status' => 'failed',
         ]);
+    }
+
+    public function test_it_blocks_horizon_when_no_authorized_session_exists(): void
+    {
+        config()->set('workerhub.operations.allow_local_bypass', false);
+        config()->set('workerhub.operations.access_token', '');
+
+        $this->get('/horizon')->assertForbidden();
     }
 }
