@@ -106,7 +106,7 @@
             min-width:180px;
         }
         .operator-chip strong { display:block; color:var(--ink); }
-        .hero { display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(320px, .8fr); gap:18px; margin-bottom:22px; align-items:stretch; }
+        .hero { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(320px, .85fr); gap:18px; margin-bottom:22px; align-items:stretch; }
         .panel { background:var(--panel); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
         .headline { padding:28px; }
         .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:12px; color:var(--muted); margin-bottom:10px; font-weight:700; }
@@ -115,8 +115,37 @@
         .status-box { padding:24px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(145deg, rgba(13,98,214,.10), rgba(255,255,255,.96)); }
         .status-dot { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
         .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 6px rgba(13,98,214,.10); }
-        .cards { display:grid; grid-template-columns:repeat(6, minmax(0,1fr)); gap:14px; margin-bottom:20px; }
-        .metric { padding:18px; min-height:116px; background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(245,249,255,.84)); }
+        .status-grid { display:grid; grid-template-columns:1fr; gap:10px; margin-top:18px; }
+        .status-pill {
+            padding:14px 16px;
+            border-radius:18px;
+            border:1px solid var(--line);
+            background:rgba(255,255,255,.72);
+        }
+        .status-pill span {
+            display:block;
+            font-size:12px;
+            letter-spacing:.12em;
+            text-transform:uppercase;
+            color:var(--muted);
+            margin-bottom:6px;
+            font-weight:700;
+        }
+        .status-pill strong {
+            display:block;
+            font-size:24px;
+            line-height:1.1;
+            color:var(--ink);
+            margin-bottom:4px;
+        }
+        .status-pill small {
+            display:block;
+            color:var(--muted);
+            font-size:13px;
+            line-height:1.5;
+        }
+        .cards { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; margin-bottom:20px; }
+        .metric { padding:18px; min-height:108px; background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(245,249,255,.84)); }
         .metric-label { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
         .metric-value { font-size:38px; margin:10px 0 6px; }
         .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:14px; }
@@ -143,6 +172,27 @@
         .checkbox { width:16px; height:16px; accent-color:var(--accent); }
         .detail { padding:22px; position:sticky; top:18px; }
         .detail h2 { margin-top:0; font-size:26px; }
+        .detail-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0 18px; }
+        .detail-tab {
+            border:1px solid var(--line);
+            background:#fff;
+            color:var(--muted);
+            border-radius:999px;
+            padding:10px 14px;
+            font:inherit;
+            font-size:12px;
+            font-weight:800;
+            letter-spacing:.12em;
+            text-transform:uppercase;
+            cursor:pointer;
+        }
+        .detail-tab.active {
+            background:var(--accent);
+            border-color:var(--accent);
+            color:#fff;
+        }
+        .detail-pane { display:none; }
+        .detail-pane.active { display:block; }
         .detail-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; margin-bottom:18px; }
         .detail-card { padding:14px; border-radius:16px; border:1px solid var(--line); background:#fff; min-width:0; }
         .detail-card.full { grid-column:1 / -1; }
@@ -212,11 +262,23 @@
             <p class="hint" style="margin-top:12px;">Acceso unificado con backoffice: la misma sesión habilita este monitor y el dashboard de Horizon.</p>
         </article>
         <aside class="panel status-box">
-            <div class="status-dot">Estado en tiempo real</div>
-            <div>
-                <div class="metric-value" id="socket-state">Polling</div>
-                <div class="metric-subtle" id="socket-detail">Esperando configuracion de socket...</div>
-                <div class="metric-subtle" id="health-detail" style="margin-top:12px;">Health operativo pendiente...</div>
+            <div class="status-dot">Infraestructura operativa</div>
+            <div class="status-grid">
+                <div class="status-pill">
+                    <span>Realtime</span>
+                    <strong id="socket-state">Polling</strong>
+                    <small id="socket-detail">Esperando configuracion de socket...</small>
+                </div>
+                <div class="status-pill">
+                    <span>Despacho</span>
+                    <strong id="dispatch-mode">-</strong>
+                    <small id="health-detail">Health operativo pendiente...</small>
+                </div>
+                <div class="status-pill">
+                    <span>Backoffice</span>
+                    <strong id="backoffice-state">Pendiente</strong>
+                    <small>La sesion operativa y el acceso a Horizon comparten esta dependencia.</small>
+                </div>
             </div>
         </aside>
     </section>
@@ -309,23 +371,37 @@
             <div class="eyebrow">Detalle</div>
             <h2 id="detail-title">Selecciona una tarea</h2>
             <p class="hint" id="detail-subtitle">Aqui veras eventos, payload resumido y opciones operativas.</p>
-            <div class="detail-grid" id="detail-grid"></div>
-            <div class="actions" style="display:flex; gap:10px; margin-bottom:12px;">
-                <button id="retry-button" type="button" disabled>Reencolar tarea</button>
-                <button id="open-api-button" class="secondary" type="button" disabled>Abrir JSON</button>
+            <div class="detail-tabs">
+                <button class="detail-tab active" type="button" data-detail-tab="summary">Resumen</button>
+                <button class="detail-tab" type="button" data-detail-tab="lineage">Lineage</button>
+                <button class="detail-tab" type="button" data-detail-tab="events">Eventos</button>
+                <button class="detail-tab" type="button" data-detail-tab="actions">Acciones</button>
             </div>
-            <div class="hint" id="detail-error"></div>
-            <div class="stream">
-                <div class="eyebrow">Lineage</div>
-                <div id="detail-lineage" class="hint">Sin datos.</div>
+            <div class="detail-pane active" data-detail-pane="summary">
+                <div class="detail-grid" id="detail-grid"></div>
+                <div class="actions" style="display:flex; gap:10px; margin-bottom:12px;">
+                    <button id="retry-button" type="button" disabled>Reencolar tarea</button>
+                    <button id="open-api-button" class="secondary" type="button" disabled>Abrir JSON</button>
+                </div>
+                <div class="hint" id="detail-error"></div>
             </div>
-            <div class="stream">
-                <div class="eyebrow">Eventos</div>
-                <div id="detail-events" class="hint">Sin datos.</div>
+            <div class="detail-pane" data-detail-pane="lineage">
+                <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
+                    <div class="eyebrow">Lineage</div>
+                    <div id="detail-lineage" class="hint">Sin datos.</div>
+                </div>
             </div>
-            <div class="stream">
-                <div class="eyebrow">Acciones operativas</div>
-                <div id="detail-actions" class="hint">Sin datos.</div>
+            <div class="detail-pane" data-detail-pane="events">
+                <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
+                    <div class="eyebrow">Eventos</div>
+                    <div id="detail-events" class="hint">Sin datos.</div>
+                </div>
+            </div>
+            <div class="detail-pane" data-detail-pane="actions">
+                <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
+                    <div class="eyebrow">Acciones operativas</div>
+                    <div id="detail-actions" class="hint">Sin datos.</div>
+                </div>
             </div>
         </aside>
     </section>
@@ -358,7 +434,11 @@ const nodes = {
     socketState: document.getElementById('socket-state'),
     socketDetail: document.getElementById('socket-detail'),
     healthDetail: document.getElementById('health-detail'),
+    dispatchMode: document.getElementById('dispatch-mode'),
+    backofficeState: document.getElementById('backoffice-state'),
     filterSummary: document.getElementById('filter-summary'),
+    detailTabs: Array.from(document.querySelectorAll('[data-detail-tab]')),
+    detailPanes: Array.from(document.querySelectorAll('[data-detail-pane]')),
 };
 const filterInputs = {
     source: document.getElementById('filter-source'),
@@ -375,6 +455,7 @@ const filterInputs = {
 
 hydrateFilters();
 renderFilterSummary();
+activateDetailTab('summary');
 
 document.getElementById('refresh-button').addEventListener('click', () => refreshAll(true));
 document.getElementById('reset-filters-button').addEventListener('click', () => {
@@ -393,6 +474,10 @@ Object.entries(filterInputs).forEach(([key, input]) => {
         renderFilterSummary();
         refreshAll(true);
     });
+});
+
+nodes.detailTabs.forEach(button => {
+    button.addEventListener('click', () => activateDetailTab(button.dataset.detailTab));
 });
 
 nodes.exportTasksButton.addEventListener('click', () => window.open(`/api/monitor/tasks/export?${buildTaskParams()}`, '_blank'));
@@ -590,6 +675,16 @@ function renderFilterSummary() {
     nodes.filterSummary.textContent = labels.length === 0 ? 'Sin filtros activos.' : `Filtros activos: ${labels.join(' | ')}`;
 }
 
+function activateDetailTab(tab) {
+    nodes.detailTabs.forEach(button => {
+        button.classList.toggle('active', button.dataset.detailTab === tab);
+    });
+
+    nodes.detailPanes.forEach(pane => {
+        pane.classList.toggle('active', pane.dataset.detailPane === tab);
+    });
+}
+
 async function fetchJson(url) {
     const response = await fetch(url, { headers: { 'Accept': 'application/json', ...operatorHeaders() } });
     if (!response.ok) {
@@ -611,10 +706,14 @@ async function refreshHealth() {
     try {
         const payload = await fetchJson(`/api/health/workerhub?${buildTokenQuery().toString()}`);
         const alerts = Array.isArray(payload.alerts) ? payload.alerts : [];
+        nodes.dispatchMode.textContent = payload.checks?.kafka?.dispatch_mode || 'desconocido';
+        nodes.backofficeState.textContent = payload.checks?.backoffice?.ok ? 'Disponible' : 'Degradado';
         nodes.healthDetail.textContent = alerts.length === 0
             ? `Health ${payload.status}: sin alertas operativas.`
             : `Health ${payload.status}: ${alerts.join(' | ')}`;
     } catch (error) {
+        nodes.dispatchMode.textContent = 'error';
+        nodes.backofficeState.textContent = 'Error';
         nodes.healthDetail.textContent = `Health degradado: ${error.message}`;
     }
 }
