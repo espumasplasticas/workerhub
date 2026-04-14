@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\DocumentMigrationController;
 use App\Http\Controllers\Api\HealthController;
 use App\Http\Controllers\Api\ReceiptMigrationController;
+use App\Http\Controllers\Api\WorkerTaskLifecycleController;
 use App\Http\Controllers\Api\WorkerTaskMonitorController;
 use App\Http\Controllers\Api\WorkerTaskController;
 use Illuminate\Http\Request;
@@ -27,6 +28,7 @@ Route::get('/health/workerhub', HealthController::class);
 Route::post('/worker-tasks', [WorkerTaskController::class, 'store']);
 Route::post('/document-migrations', [DocumentMigrationController::class, 'store']);
 Route::post('/receipt-migrations', [ReceiptMigrationController::class, 'store']);
+Route::post('/internal/tasks/{taskId}/status', [WorkerTaskLifecycleController::class, 'update']);
 Route::middleware(['web', 'workerhub.operator'])->group(function () {
     Route::get('/monitor/tasks', [WorkerTaskMonitorController::class, 'index']);
     Route::get('/monitor/tasks/export', [WorkerTaskMonitorController::class, 'exportTasks']);

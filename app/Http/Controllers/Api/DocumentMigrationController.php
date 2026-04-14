@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use Illuminate\Http\JsonResponse;
@@ -12,6 +13,7 @@ use Illuminate\Support\Str;
 class DocumentMigrationController extends Controller
 {
     public function __construct(
+        private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
         private readonly WorkerTaskDispatchService $dispatcher,
         private readonly WorkerTaskMonitorService $monitor
     )
@@ -56,15 +58,17 @@ class DocumentMigrationController extends Controller
             ],
             'submitted_at' => now()->toIso8601String(),
         ];
+        $executionPlan = $this->executionPlanResolver->resolve($message);
+        $requestTopic = (string) ($executionPlan['request_topic'] ?? config('workerhub.kafka.topics.requests'));
 
         $this->monitor->createTask(
             $message,
-            (string) config('workerhub.kafka.topics.requests'),
+            $requestTopic,
             $validated['document_id']
         );
 
         $dispatch = $this->dispatcher->dispatch(
-            (string) config('workerhub.kafka.topics.requests'),
+            $requestTopic,
             $message,
             $validated['document_id']
         );
@@ -79,7 +83,7 @@ class DocumentMigrationController extends Controller
             'accepted' => true,
             'task_id' => $taskId,
             'document_id' => $validated['document_id'],
-            'topic' => config('workerhub.kafka.topics.requests'),
+            'topic' => $requestTopic,
             'dispatch_mode' => $dispatch['mode'],
             'queue' => $dispatch['queue'],
         ], 202);

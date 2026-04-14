@@ -6,6 +6,7 @@ use App\Data\MonitorTaskFilters;
 use App\Events\WorkerTaskUpdated;
 use App\Models\WorkerTask;
 use App\Models\WorkerTaskEvent;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use App\Support\WorkerTaskProcessCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
@@ -15,18 +16,15 @@ class WorkerTaskMonitorService
 {
     public function __construct(
         private readonly WorkerTaskNotificationService $notifications,
-        private readonly WorkerTaskProcessCatalog $processCatalog
+        private readonly WorkerTaskProcessCatalog $processCatalog,
+        private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver
     ) {
     }
 
     public function createTask(array $task, string $topic, ?string $key = null): WorkerTask
     {
         $payload = $task['payload'] ?? [];
-        $process = $this->processCatalog->resolve(
-            (string) ($task['type'] ?? ''),
-            is_array($payload) ? $payload : [],
-            Arr::get($payload, 'source')
-        );
+        $executionPlan = $this->executionPlanResolver->resolve($task);
 
         $record = WorkerTask::query()->create([
             'id' => $task['task_id'],
@@ -42,10 +40,13 @@ class WorkerTaskMonitorService
                 'headers' => $task['headers'] ?? [],
                 'submitted_at' => $task['submitted_at'] ?? null,
                 'replayed_from_task_id' => $task['parent_task_id'] ?? null,
-                'process_key' => $process['process_key'],
-                'process_label' => $process['process_label'],
-                'schedule_name' => $process['schedule_name'],
-                'task_name' => $process['task_name'],
+                'process_key' => $executionPlan['process_key'],
+                'process_label' => $executionPlan['process_label'],
+                'schedule_name' => $executionPlan['schedule_name'],
+                'task_name' => $executionPlan['task_name'],
+                'runtime' => $executionPlan['runtime'] ?? 'php',
+                'request_topic' => $executionPlan['request_topic'] ?? $topic,
+                'execution_topic' => $executionPlan['execution_topic'] ?? null,
             ],
             'requested_at' => now(),
         ]);

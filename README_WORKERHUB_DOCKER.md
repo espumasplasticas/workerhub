@@ -183,6 +183,11 @@ El autoescalado actual es a nivel de procesos dentro de `Horizon`, no a nivel de
 
 Si necesitas escalar contenedores automaticamente, el siguiente paso serio es `Kubernetes + KEDA`. Para Docker Compose el control dinamico realista y estable es Horizon.
 
+La base de ese siguiente paso ya queda en:
+
+- [WORKERHUB_K8S_KEDA.md](C:/laragon/www/WorkerHub/docs/WORKERHUB_K8S_KEDA.md)
+- [k8s/base](C:/laragon/www/WorkerHub/k8s/base)
+
 ## Variables clave
 
 - `QUEUE_CONNECTION=redis`

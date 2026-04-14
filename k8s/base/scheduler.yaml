@@ -1,0 +1,28 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workerhub-scheduler
+  namespace: workerhub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workerhub-scheduler
+  template:
+    metadata:
+      labels:
+        app: workerhub-scheduler
+    spec:
+      containers:
+        - name: scheduler
+          image: ghcr.io/comodisimos/workerhub-php-k8s:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: workerhub-config
+            - secretRef:
+                name: workerhub-secrets
+          command:
+            - sh
+            - -lc
+            - php artisan schedule:work

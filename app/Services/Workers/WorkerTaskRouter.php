@@ -3,11 +3,13 @@
 namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use InvalidArgumentException;
 
 class WorkerTaskRouter
 {
     public function __construct(
+        private readonly WorkerTaskExecutionPlanResolver $executionPlan,
         private readonly DocumentMigrationService $documentMigrationService,
         private readonly ReceiptMigrationService $receiptMigrationService
     ) {
@@ -15,36 +17,26 @@ class WorkerTaskRouter
 
     public function resolveQueue(array $task): string
     {
-        $type = (string) ($task['type'] ?? '');
-        $priority = strtolower((string) ($task['priority'] ?? 'default'));
-
-        return match ($type) {
-            'document_migration' => $priority === 'high'
-                ? (string) config('workerhub.tasks.document_migration.high_priority_queue')
-                : (string) config('workerhub.tasks.document_migration.queue'),
-            'receipt_migration' => $priority === 'high'
-                ? (string) config('workerhub.tasks.receipt_migration.high_priority_queue')
-                : (string) config('workerhub.tasks.receipt_migration.queue'),
-            default => (string) config('workerhub.queues.default'),
-        };
+        return (string) ($this->executionPlan->resolve($task)['queue'] ?? config('workerhub.queues.default'));
     }
 
     public function resolveTries(array $task): int
     {
-        return match ((string) ($task['type'] ?? '')) {
-            'document_migration' => (int) config('workerhub.tasks.document_migration.tries', 3),
-            'receipt_migration' => (int) config('workerhub.tasks.receipt_migration.tries', 3),
-            default => 3,
-        };
+        return (int) ($this->executionPlan->resolve($task)['tries'] ?? 3);
     }
 
     public function resolveTimeout(array $task): int
     {
-        return match ((string) ($task['type'] ?? '')) {
-            'document_migration' => (int) config('workerhub.tasks.document_migration.timeout', 300),
-            'receipt_migration' => (int) config('workerhub.tasks.receipt_migration.timeout', 300),
-            default => 180,
-        };
+        return (int) ($this->executionPlan->resolve($task)['timeout'] ?? 180);
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     * @return array<string, mixed>
+     */
+    public function resolveExecutionPlan(array $task): array
+    {
+        return $this->executionPlan->resolve($task);
     }
 
     public function handle(array $task): array

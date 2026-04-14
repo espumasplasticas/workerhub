@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use Illuminate\Http\JsonResponse;
@@ -12,6 +13,7 @@ use Illuminate\Support\Str;
 class WorkerTaskController extends Controller
 {
     public function __construct(
+        private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
         private readonly WorkerTaskDispatchService $dispatcher,
         private readonly WorkerTaskMonitorService $monitor
     )
@@ -41,15 +43,17 @@ class WorkerTaskController extends Controller
             'payload' => $payload,
             'submitted_at' => now()->toIso8601String(),
         ];
+        $executionPlan = $this->executionPlanResolver->resolve($message);
+        $requestTopic = (string) ($executionPlan['request_topic'] ?? config('workerhub.kafka.topics.requests'));
 
         $this->monitor->createTask(
             $message,
-            (string) config('workerhub.kafka.topics.requests'),
+            $requestTopic,
             $key
         );
 
         $dispatch = $this->dispatcher->dispatch(
-            (string) config('workerhub.kafka.topics.requests'),
+            $requestTopic,
             $message,
             $key,
             $validated['headers'] ?? []
@@ -64,7 +68,7 @@ class WorkerTaskController extends Controller
         return response()->json([
             'accepted' => true,
             'task_id' => $taskId,
-            'topic' => config('workerhub.kafka.topics.requests'),
+            'topic' => $requestTopic,
             'dispatch_mode' => $dispatch['mode'],
             'queue' => $dispatch['queue'],
             'key' => $key,

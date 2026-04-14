@@ -5,6 +5,16 @@ return [
         'default' => env('WORKERHUB_DEFAULT_QUEUE', 'migration-default'),
         'high_priority' => env('WORKERHUB_HIGH_PRIORITY_QUEUE', 'migration-high'),
         'integration' => env('WORKERHUB_INTEGRATION_QUEUE', 'integration'),
+        'receipts_default' => env('WORKERHUB_RECEIPTS_QUEUE', 'receipts-default'),
+        'receipts_high' => env('WORKERHUB_RECEIPTS_HIGH_QUEUE', 'receipts-high'),
+        'sales_orders_default' => env('WORKERHUB_SALES_ORDERS_QUEUE', 'sales-orders-default'),
+        'sales_orders_high' => env('WORKERHUB_SALES_ORDERS_HIGH_QUEUE', 'sales-orders-high'),
+        'invoices_default' => env('WORKERHUB_INVOICES_QUEUE', 'invoices-default'),
+        'invoices_high' => env('WORKERHUB_INVOICES_HIGH_QUEUE', 'invoices-high'),
+        'customers_default' => env('WORKERHUB_CUSTOMERS_QUEUE', 'customers-default'),
+        'customers_high' => env('WORKERHUB_CUSTOMERS_HIGH_QUEUE', 'customers-high'),
+        'general_default' => env('WORKERHUB_GENERAL_QUEUE', 'general-default'),
+        'general_high' => env('WORKERHUB_GENERAL_HIGH_QUEUE', 'general-high'),
     ],
 
     'tasks' => [
@@ -43,6 +53,7 @@ return [
             'results' => env('KAFKA_TOPIC_RESULTS', 'workerhub.tasks.results'),
             'failures' => env('KAFKA_TOPIC_FAILURES', 'workerhub.tasks.failures'),
             'dead_letters' => env('KAFKA_TOPIC_DEAD_LETTERS', 'workerhub.tasks.dead_letters'),
+            'external_execution_prefix' => env('KAFKA_TOPIC_EXTERNAL_EXECUTION_PREFIX', 'workerhub.runtime'),
         ],
     ],
 
@@ -53,6 +64,7 @@ return [
 
     'operations' => [
         'access_token' => env('WORKERHUB_OPERATIONS_TOKEN', ''),
+        'runtime_shared_token' => env('WORKERHUB_RUNTIME_SHARED_TOKEN', env('WORKERHUB_OPERATIONS_TOKEN', '')),
         'allow_token_fallback' => filter_var(env('WORKERHUB_ALLOW_TOKEN_FALLBACK', true), FILTER_VALIDATE_BOOL),
         'allow_local_bypass' => filter_var(env('WORKERHUB_ALLOW_LOCAL_BYPASS', true), FILTER_VALIDATE_BOOL),
         'allowed_emails' => array_values(array_filter(array_map(
@@ -105,26 +117,81 @@ return [
             'label' => 'Recibos',
             'description' => 'Migraciones de recaudo y aplicaciones de recibo.',
             'keywords' => ['recibo', 'recibos', 'cxc recibo', 'importarrecibos'],
+            'runtime' => env('WORKERHUB_RECEIPTS_RUNTIME', 'php'),
+            'queues' => [
+                'default' => env('WORKERHUB_RECEIPTS_QUEUE', 'receipts-default'),
+                'high' => env('WORKERHUB_RECEIPTS_HIGH_QUEUE', 'receipts-high'),
+            ],
+            'topics' => [
+                'requests' => env('KAFKA_TOPIC_REQUESTS', 'workerhub.tasks.requests'),
+                'execution' => env('KAFKA_TOPIC_RECEIPTS_EXECUTION', 'workerhub.runtime.php.receipts'),
+            ],
+            'tries' => (int) env('WORKERHUB_RECEIPTS_TRIES', env('WORKERHUB_RECEIPT_MIGRATION_TRIES', 3)),
+            'timeout' => (int) env('WORKERHUB_RECEIPTS_TIMEOUT', env('WORKERHUB_RECEIPT_MIGRATION_TIMEOUT', 300)),
         ],
         'sales_orders' => [
             'label' => 'Pedidos',
             'description' => 'Pedidos comerciales y sus reintentos.',
             'keywords' => ['pedido', 'pedidos', 'order', 'sales order'],
+            'runtime' => env('WORKERHUB_SALES_ORDERS_RUNTIME', 'php'),
+            'queues' => [
+                'default' => env('WORKERHUB_SALES_ORDERS_QUEUE', 'sales-orders-default'),
+                'high' => env('WORKERHUB_SALES_ORDERS_HIGH_QUEUE', 'sales-orders-high'),
+            ],
+            'topics' => [
+                'requests' => env('KAFKA_TOPIC_REQUESTS', 'workerhub.tasks.requests'),
+                'execution' => env('KAFKA_TOPIC_SALES_ORDERS_EXECUTION', 'workerhub.runtime.php.sales_orders'),
+            ],
+            'tries' => (int) env('WORKERHUB_SALES_ORDERS_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_SALES_ORDERS_TIMEOUT', 300),
         ],
         'invoices' => [
             'label' => 'Facturas',
             'description' => 'Facturas y documentos relacionados.',
             'keywords' => ['factura', 'facturas', 'invoice', 'cxcfactura'],
+            'runtime' => env('WORKERHUB_INVOICES_RUNTIME', 'php'),
+            'queues' => [
+                'default' => env('WORKERHUB_INVOICES_QUEUE', 'invoices-default'),
+                'high' => env('WORKERHUB_INVOICES_HIGH_QUEUE', 'invoices-high'),
+            ],
+            'topics' => [
+                'requests' => env('KAFKA_TOPIC_REQUESTS', 'workerhub.tasks.requests'),
+                'execution' => env('KAFKA_TOPIC_INVOICES_EXECUTION', 'workerhub.runtime.php.invoices'),
+            ],
+            'tries' => (int) env('WORKERHUB_INVOICES_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_INVOICES_TIMEOUT', 300),
         ],
         'customers' => [
             'label' => 'Clientes',
             'description' => 'Clientes, terceros y sucursales.',
             'keywords' => ['cliente', 'clientes', 'tercero', 'terceros', 'sucursal'],
+            'runtime' => env('WORKERHUB_CUSTOMERS_RUNTIME', 'python'),
+            'queues' => [
+                'default' => env('WORKERHUB_CUSTOMERS_QUEUE', 'customers-default'),
+                'high' => env('WORKERHUB_CUSTOMERS_HIGH_QUEUE', 'customers-high'),
+            ],
+            'topics' => [
+                'requests' => env('KAFKA_TOPIC_REQUESTS', 'workerhub.tasks.requests'),
+                'execution' => env('KAFKA_TOPIC_CUSTOMERS_EXECUTION', 'workerhub.runtime.python.customers'),
+            ],
+            'tries' => (int) env('WORKERHUB_CUSTOMERS_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_CUSTOMERS_TIMEOUT', 300),
         ],
         'general' => [
             'label' => 'General',
             'description' => 'Procesos sin clasificacion explicita.',
             'keywords' => [],
+            'runtime' => env('WORKERHUB_GENERAL_RUNTIME', 'php'),
+            'queues' => [
+                'default' => env('WORKERHUB_GENERAL_QUEUE', 'general-default'),
+                'high' => env('WORKERHUB_GENERAL_HIGH_QUEUE', 'general-high'),
+            ],
+            'topics' => [
+                'requests' => env('KAFKA_TOPIC_REQUESTS', 'workerhub.tasks.requests'),
+                'execution' => env('KAFKA_TOPIC_GENERAL_EXECUTION', 'workerhub.runtime.php.general'),
+            ],
+            'tries' => (int) env('WORKERHUB_GENERAL_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_GENERAL_TIMEOUT', 180),
         ],
     ],
 ];
