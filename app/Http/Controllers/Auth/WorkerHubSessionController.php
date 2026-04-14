@@ -65,6 +65,19 @@ class WorkerHubSessionController extends Controller
         }
 
         if (!$result->authenticated) {
+            if ($this->canUseDevelopmentBypass()) {
+                $this->operatorSession->storeDevelopmentBypass($request, $credentials['username']);
+                $request->attributes->set('workerhub_actor', $credentials['username']);
+                $request->attributes->set('workerhub_access_channel', 'local_bypass');
+
+                $this->operationLogs->record($request, 'auth.login.local_bypass', 'success', null, [
+                    'username' => $credentials['username'],
+                    'reason' => 'invalid_credentials',
+                ]);
+
+                return redirect()->intended(route('monitor.dashboard'));
+            }
+
             $this->operationLogs->record($request, 'auth.login.failed', 'failed', null, [
                 'reason' => 'invalid_credentials',
                 'username' => $credentials['username'],

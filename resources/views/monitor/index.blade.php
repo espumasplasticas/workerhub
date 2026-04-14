@@ -698,7 +698,18 @@ const processDefinitionMap = new Map((window.workerhubProcessDefinitions || []).
 const FILTER_STORAGE_KEY = 'workerhub.monitor.filters';
 const TASK_STORAGE_KEY = 'workerhub.monitor.selected_task_id';
 const defaultFilters = { status: '', type: '', source: '', process_key: '', schedule_name: '', mode: 'all', priority: '', queue: '', date_from: '', date_to: '', replay_mode: 'all', error_mode: 'all' };
-const state = { filters: loadStoredFilters(), tasks: [], actions: [], lineage: null, selectedTaskId: loadStoredTaskId(), selectedIds: new Set(), echo: null, refreshTimer: null, summary: null };
+const state = {
+    filters: loadStoredFilters(),
+    tasks: [],
+    actions: [],
+    lineage: null,
+    selectedTaskId: loadStoredTaskId(),
+    selectedIds: new Set(),
+    echo: null,
+    refreshTimer: null,
+    summary: null,
+    detailModalOpen: false,
+};
 const nodes = {
     body: document.getElementById('tasks-body'),
     detailTitle: document.getElementById('detail-title'),
@@ -805,7 +816,7 @@ nodes.retryButton.addEventListener('click', async () => {
 
     nodes.detailError.textContent = `Replay aceptado. Nueva tarea: ${data.task_id}`;
     await refreshAll(true);
-    await showTask(data.task_id);
+    await showTask(data.task_id, { openModal: true });
 });
 
 nodes.retryBatchButton.addEventListener('click', async () => {
@@ -1014,11 +1025,13 @@ function activateDetailTab(tab) {
 }
 
 function openDetailModal() {
+    state.detailModalOpen = true;
     nodes.detailModal.classList.add('is-open');
     nodes.detailModal.setAttribute('aria-hidden', 'false');
 }
 
 function closeDetailModal() {
+    state.detailModalOpen = false;
     nodes.detailModal.classList.remove('is-open');
     nodes.detailModal.setAttribute('aria-hidden', 'true');
 }
@@ -1070,7 +1083,7 @@ async function refreshTasks(keepSelection = false) {
 
     if (!keepSelection || !state.selectedTaskId) {
         if (state.tasks[0]) {
-            await showTask(state.tasks[0].id);
+            await showTask(state.tasks[0].id, { openModal: false });
         } else {
             renderTaskDetail(null);
         }
@@ -1079,9 +1092,9 @@ async function refreshTasks(keepSelection = false) {
 
     const selected = state.tasks.find(task => task.id === state.selectedTaskId);
     if (selected) {
-        await showTask(selected.id);
+        await showTask(selected.id, { openModal: false });
     } else if (state.tasks[0]) {
-        await showTask(state.tasks[0].id);
+        await showTask(state.tasks[0].id, { openModal: false });
     } else {
         renderTaskDetail(null);
     }
@@ -1131,12 +1144,12 @@ function renderTasks() {
     nodes.body.querySelectorAll('[data-detail-task-id]').forEach(button => {
         button.addEventListener('click', async event => {
             event.stopPropagation();
-            await showTask(button.dataset.detailTaskId);
+            await showTask(button.dataset.detailTaskId, { openModal: true });
         });
     });
 }
 
-async function showTask(taskId) {
+async function showTask(taskId, { openModal = false } = {}) {
     state.selectedTaskId = taskId;
     saveSelectedTaskId(taskId);
     renderTasks();
@@ -1148,7 +1161,9 @@ async function showTask(taskId) {
 
     state.lineage = lineage;
     renderTaskDetail(task);
-    openDetailModal();
+    if (openModal || state.detailModalOpen) {
+        openDetailModal();
+    }
 }
 
 function renderTaskDetail(task) {

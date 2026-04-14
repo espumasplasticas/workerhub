@@ -122,6 +122,40 @@ class WorkerHubAuthenticationTest extends TestCase
         ]);
     }
 
+    public function test_it_uses_development_bypass_when_backoffice_rejects_credentials_and_bypass_is_enabled(): void
+    {
+        $this->withoutMiddleware(VerifyCsrfToken::class);
+        config()->set('workerhub.operations.allow_local_bypass', true);
+
+        $client = Mockery::mock(BackofficeAuthClientInterface::class);
+        $client->shouldReceive('authenticateOperator')
+            ->once()
+            ->with('lialvarez', 'secret')
+            ->andReturn(BackofficeAuthResult::fromPayload([
+                'authenticated' => false,
+                'authorized' => false,
+                'active' => true,
+                'role_id' => null,
+                'user' => null,
+            ], 401));
+        $this->app->instance(BackofficeAuthClientInterface::class, $client);
+
+        $this->post('/login', [
+            'username' => 'lialvarez',
+            'password' => 'secret',
+        ])->assertRedirect(route('monitor.dashboard'));
+
+        $this->assertSame('lialvarez', session('workerhub.operator.email'));
+        $this->assertSame('local_bypass', session('workerhub.operator.access_channel'));
+
+        $this->assertDatabaseHas('worker_operation_logs', [
+            'action' => 'auth.login.local_bypass',
+            'status' => 'success',
+            'actor' => 'lialvarez',
+            'channel' => 'local_bypass',
+        ]);
+    }
+
     public function test_it_redirects_web_monitor_to_login_when_no_session_or_token_exists(): void
     {
         config()->set('workerhub.operations.allow_local_bypass', false);
