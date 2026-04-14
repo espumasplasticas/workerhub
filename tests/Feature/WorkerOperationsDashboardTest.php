@@ -14,7 +14,8 @@ class WorkerOperationsDashboardTest extends TestCase
         $this->get('/')
             ->assertOk()
             ->assertSee('WorkerHub Monitor')
-            ->assertSee('Monitor azul para operación de colas, DLQ y replay.');
+            ->assertSee('Centro de operacion para colas y migracion documental.')
+            ->assertSee('Bandeja operativa');
 
         $this->assertDatabaseHas('worker_operation_logs', [
             'action' => 'monitor.view',

@@ -6,24 +6,25 @@
     <title>WorkerHub Monitor</title>
     <style>
         :root {
-            --bg:#eef5ff;
-            --panel:rgba(255,255,255,.88);
+            --bg:#e8f1ff;
+            --panel:rgba(255,255,255,.94);
             --panel-strong:#ffffff;
             --ink:#10203d;
-            --muted:#5d7298;
-            --accent:#0d62d6;
-            --accent-strong:#0848a2;
-            --accent-soft:rgba(13,98,214,.12);
-            --warn:#b26a12;
-            --warn-soft:rgba(255,184,78,.18);
-            --danger:#c73b55;
-            --danger-soft:rgba(199,59,85,.12);
-            --success:#138a63;
-            --success-soft:rgba(19,138,99,.12);
-            --info:#2460c5;
-            --info-soft:rgba(36,96,197,.1);
-            --line:rgba(26,90,176,.14);
-            --shadow:0 26px 60px rgba(13,53,120,.12);
+            --muted:#61759b;
+            --accent:#1566e8;
+            --accent-strong:#0f4faf;
+            --accent-soft:rgba(21,102,232,.10);
+            --warn:#c57a17;
+            --warn-soft:rgba(244,176,56,.18);
+            --danger:#c83d60;
+            --danger-soft:rgba(200,61,96,.12);
+            --success:#148a63;
+            --success-soft:rgba(20,138,99,.12);
+            --navy:#0b2250;
+            --navy-soft:#15386d;
+            --line:rgba(23,78,165,.12);
+            --line-strong:rgba(23,78,165,.2);
+            --shadow:0 24px 60px rgba(10,34,80,.14);
         }
         * { box-sizing:border-box; }
         html, body { overflow-x:hidden; }
@@ -32,11 +33,11 @@
             font-family:"Manrope","Segoe UI",sans-serif;
             color:var(--ink);
             background:
-                radial-gradient(circle at top left, rgba(13,98,214,.18), transparent 28%),
-                radial-gradient(circle at top right, rgba(82,146,255,.18), transparent 22%),
-                linear-gradient(180deg, #f7fbff 0%, var(--bg) 100%);
+                radial-gradient(circle at top left, rgba(21,102,232,.24), transparent 24%),
+                radial-gradient(circle at top right, rgba(88,156,255,.18), transparent 20%),
+                linear-gradient(180deg, #f6f9ff 0%, var(--bg) 100%);
         }
-        .shell { width:min(1680px, calc(100vw - 32px)); margin:0 auto; padding:26px 0 42px; }
+        .shell { width:min(1680px, calc(100vw - 32px)); margin:0 auto; padding:20px 0 36px; }
         .topbar { margin-bottom:18px; }
         .topbar-card {
             display:flex;
@@ -44,9 +45,9 @@
             justify-content:space-between;
             gap:18px;
             padding:18px 22px;
-            border:1px solid var(--line);
+            border:1px solid rgba(255,255,255,.12);
             border-radius:24px;
-            background:linear-gradient(145deg, rgba(255,255,255,.92), rgba(244,249,255,.84));
+            background:linear-gradient(135deg, rgba(11,34,80,.96), rgba(21,56,109,.92));
             box-shadow:var(--shadow);
             backdrop-filter:blur(16px);
         }
@@ -61,7 +62,7 @@
         .brand-copy small {
             display:block;
             margin-bottom:4px;
-            color:var(--muted);
+            color:rgba(223,235,255,.74);
             text-transform:uppercase;
             letter-spacing:.18em;
             font-size:11px;
@@ -72,8 +73,9 @@
             font-size:24px;
             line-height:1;
             font-family:"Instrument Sans","Segoe UI",sans-serif;
+            color:#fff;
         }
-        .brand-copy span { color:var(--muted); font-size:13px; }
+        .brand-copy span { color:rgba(235,243,255,.82); font-size:13px; }
         .nav {
             display:flex;
             align-items:center;
@@ -87,40 +89,55 @@
             min-height:42px;
             padding:0 16px;
             border-radius:999px;
-            border:1px solid var(--line);
-            background:#fff;
-            color:var(--ink);
+            border:1px solid rgba(255,255,255,.14);
+            background:rgba(255,255,255,.08);
+            color:#eff5ff;
             text-decoration:none;
             font:inherit;
             font-size:13px;
             font-weight:700;
             cursor:pointer;
         }
-        .nav-link.active, .nav-link:hover, .nav button:hover { background:var(--accent); border-color:var(--accent); color:#fff; }
+        .nav-link.active, .nav-link:hover, .nav button:hover { background:#fff; border-color:#fff; color:var(--navy); }
         .operator-chip {
             margin-left:6px;
             padding-left:14px;
-            border-left:1px solid var(--line);
-            color:var(--muted);
+            border-left:1px solid rgba(255,255,255,.14);
+            color:rgba(223,235,255,.78);
             font-size:13px;
             min-width:180px;
         }
-        .operator-chip strong { display:block; color:var(--ink); }
-        .hero { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(320px, .85fr); gap:18px; margin-bottom:22px; align-items:stretch; }
+        .operator-chip strong { display:block; color:#fff; }
+        .hero { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(320px, .85fr); gap:16px; margin-bottom:18px; align-items:stretch; }
         .panel { background:var(--panel); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
-        .headline { padding:28px; }
+        .headline { padding:24px 26px; background:linear-gradient(155deg, rgba(11,34,80,.97), rgba(19,57,114,.92)); color:#fff; }
         .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:12px; color:var(--muted); margin-bottom:10px; font-weight:700; }
-        h1 { margin:0 0 12px; font-size:42px; line-height:.98; font-family:"Instrument Sans","Segoe UI",sans-serif; max-width:10ch; }
-        .lead { margin:0; color:var(--muted); font-size:17px; line-height:1.6; }
-        .status-box { padding:24px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(145deg, rgba(13,98,214,.10), rgba(255,255,255,.96)); }
+        .headline .eyebrow { color:rgba(223,235,255,.72); }
+        h1 { margin:0 0 10px; font-size:40px; line-height:1; font-family:"Instrument Sans","Segoe UI",sans-serif; max-width:11ch; }
+        .lead { margin:0; color:rgba(235,243,255,.82); font-size:15px; line-height:1.65; max-width:70ch; }
+        .headline-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+        .headline-pill {
+            display:inline-flex;
+            align-items:center;
+            gap:8px;
+            min-height:40px;
+            padding:0 14px;
+            border-radius:999px;
+            border:1px solid rgba(255,255,255,.14);
+            background:rgba(255,255,255,.08);
+            color:#f4f8ff;
+            font-size:13px;
+            font-weight:700;
+        }
+        .status-box { padding:20px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(160deg, rgba(255,255,255,.96), rgba(241,247,255,.94)); }
         .status-dot { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
         .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 6px rgba(13,98,214,.10); }
         .status-grid { display:grid; grid-template-columns:1fr; gap:10px; margin-top:18px; }
         .status-pill {
             padding:14px 16px;
             border-radius:18px;
-            border:1px solid var(--line);
-            background:rgba(255,255,255,.72);
+            border:1px solid var(--line-strong);
+            background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(246,250,255,.92));
         }
         .status-pill span {
             display:block;
@@ -144,24 +161,46 @@
             font-size:13px;
             line-height:1.5;
         }
-        .cards { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:14px; margin-bottom:20px; }
-        .metric { padding:18px; min-height:108px; background:linear-gradient(180deg, rgba(255,255,255,.84), rgba(245,249,255,.84)); }
-        .metric-label { font-size:13px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; }
-        .metric-value { font-size:38px; margin:10px 0 6px; }
+        .cards { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
+        .metric { padding:18px; min-height:108px; background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(246,250,255,.92)); }
+        .metric-keyline {
+            width:46px;
+            height:4px;
+            border-radius:999px;
+            margin-bottom:12px;
+            background:linear-gradient(90deg, var(--accent), #5ab7ff);
+        }
+        .metric-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
+        .metric-value { font-size:36px; margin:8px 0 6px; font-family:"Instrument Sans","Segoe UI",sans-serif; }
         .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:14px; }
-        .workspace { display:grid; grid-template-columns:minmax(0, 1.3fr) minmax(380px, .9fr); gap:18px; align-items:start; }
+        .workspace { display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(390px, .95fr); gap:16px; align-items:start; }
         .toolbar { display:grid; gap:10px; padding:18px; }
         .toolbar.primary, .toolbar.secondary { grid-template-columns:repeat(5, minmax(0,1fr)); border-bottom:1px solid var(--line); }
         .toolbar.actions { grid-template-columns:repeat(4, minmax(0,1fr)); }
         .toolbar input, .toolbar select, .toolbar button, .actions button { border:1px solid var(--line); border-radius:14px; padding:12px 14px; font:inherit; background:#fff; color:var(--ink); }
         .toolbar button, .actions button { background:var(--accent); border-color:var(--accent); color:#fff; cursor:pointer; }
         .toolbar button.secondary, .actions button.secondary { background:#fff; color:var(--ink); border-color:var(--line); }
-        .toolbar-summary { padding:0 18px 18px; border-bottom:1px solid var(--line); }
+        .toolbar-summary {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:16px;
+            padding:0 18px 18px;
+            border-bottom:1px solid var(--line);
+        }
+        .toolbar-summary strong {
+            display:block;
+            margin-bottom:4px;
+            font-size:15px;
+            color:var(--navy);
+        }
+        .toolbar-summary span { display:block; font-size:13px; color:var(--muted); }
         .table-wrap { overflow:auto; max-height:760px; }
         table { width:100%; border-collapse:collapse; }
         th, td { padding:14px 18px; text-align:left; border-bottom:1px solid rgba(26,90,176,.10); vertical-align:top; }
         th { position:sticky; top:0; background:var(--panel); font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
         tr:hover td { background:rgba(13,98,214,.04); }
+        tr.is-selected td { background:rgba(13,98,214,.08); }
         .badge { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; letter-spacing:.04em; }
         .badge.received, .badge.published, .badge.queued, .badge.processing { background:var(--accent-soft); color:var(--accent); }
         .badge.completed { background:var(--success-soft); color:var(--success); }
@@ -201,6 +240,23 @@
         .detail-value.code { font-family:Consolas, Monaco, monospace; font-size:12px; font-weight:600; }
         .detail-value.error { max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:var(--danger-soft); color:#8e2039; }
         .detail-value.inline-badge { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
+        .collapsed-note {
+            margin-top:10px;
+            padding:12px 14px;
+            border:1px dashed var(--line-strong);
+            border-radius:14px;
+            background:rgba(20,99,226,.04);
+            color:var(--muted);
+            font-size:13px;
+            line-height:1.5;
+        }
+        details summary {
+            cursor:pointer;
+            font-size:13px;
+            font-weight:800;
+            color:var(--accent-strong);
+            letter-spacing:.04em;
+        }
         .stream { margin-top:16px; border-top:1px solid var(--line); padding-top:16px; }
         .stream-item { padding:12px 0; border-bottom:1px dashed var(--line); }
         .stream-item:last-child { border-bottom:0; }
@@ -212,9 +268,9 @@
         .task-id strong { display:block; font-size:14px; line-height:1.4; }
         .task-id .mono { display:block; margin-top:4px; color:var(--muted); }
         .table-actions { display:flex; gap:8px; align-items:center; }
-        @media (max-width:1480px) { .cards { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+        @media (max-width:1480px) { .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } }
         @media (max-width:1280px) { .hero, .workspace { grid-template-columns:1fr; } .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } .detail { position:static; } }
-        @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; min-width:0; } .shell { width:min(100vw - 20px, 100%); } }
+        @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; min-width:0; } .shell { width:min(100vw - 20px, 100%); } .toolbar-summary { flex-direction:column; align-items:flex-start; } }
         @media (max-width:720px) { h1 { font-size:32px; } .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } }
     </style>
 </head>
@@ -251,6 +307,25 @@
     <section class="hero">
         <article class="panel headline">
             <div class="eyebrow">WorkerHub Operations</div>
+            <h1>Centro de operacion para colas y migracion documental.</h1>
+            <p class="lead">Consola ejecutiva para seguimiento de tareas, reintentos, dead letters y lineage. La vista principal prioriza estado, accion y contexto; el detalle tecnico queda contenido y no compite con la lectura operativa.</p>
+            <div class="headline-meta">
+                <div class="headline-pill">
+                    <span>Canal</span>
+                    <strong id="access-channel">{{ $accessChannel ?? 'web' }}</strong>
+                </div>
+                @if (is_array($operator ?? null))
+                    <div class="headline-pill">
+                        <span>Operador</span>
+                        <strong>{{ $operator['name'] ?? $operator['email'] ?? 'sesion activa' }}</strong>
+                    </div>
+                @endif
+                <div class="headline-pill">
+                    <span>Acceso</span>
+                    <strong>Monitor y Horizon unificados</strong>
+                </div>
+            </div>
+            @if (false)
             <h1>Monitor azul para operación de colas, DLQ y replay.</h1>
             <p class="lead">Vista central para tareas en Kafka o `direct_queue`, encolamiento Redis/Horizon y migraciones documentales a Siesa. El panel prioriza claridad operativa, lectura rápida y trazabilidad completa por tarea.</p>
             <p class="hint" style="margin-top:14px;">
@@ -260,6 +335,7 @@
                 @endif
             </p>
             <p class="hint" style="margin-top:12px;">Acceso unificado con backoffice: la misma sesión habilita este monitor y el dashboard de Horizon.</p>
+            @endif
         </article>
         <aside class="panel status-box">
             <div class="status-dot">Infraestructura operativa</div>
@@ -284,12 +360,12 @@
     </section>
 
     <section class="cards">
-        <article class="panel metric"><div class="metric-label">Total</div><div class="metric-value" data-key="total">0</div><div class="metric-subtle">Tareas registradas</div></article>
-        <article class="panel metric"><div class="metric-label">Procesando</div><div class="metric-value" data-key="processing">0</div><div class="metric-subtle">En ejecucion</div></article>
-        <article class="panel metric"><div class="metric-label">Completadas</div><div class="metric-value" data-key="completed">0</div><div class="metric-subtle">Exitosas</div></article>
-        <article class="panel metric"><div class="metric-label">Dead Letters</div><div class="metric-value" data-key="dead_letters">0</div><div class="metric-subtle">Fallidas o rechazadas</div></article>
-        <article class="panel metric"><div class="metric-label">Replays</div><div class="metric-value" data-key="replayed">0</div><div class="metric-subtle">Reencoladas manualmente</div></article>
-        <article class="panel metric"><div class="metric-label">Publicadas</div><div class="metric-value" data-key="published">0</div><div class="metric-subtle">Entregadas a Kafka</div></article>
+        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Total</div><div class="metric-value" data-key="total">0</div><div class="metric-subtle">Volumen acumulado de tareas registradas</div></article>
+        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Procesando</div><div class="metric-value" data-key="processing">0</div><div class="metric-subtle">Carga activa en ejecucion</div></article>
+        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Completadas</div><div class="metric-value" data-key="completed">0</div><div class="metric-subtle">Tareas cerradas sin error</div></article>
+        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Dead Letters</div><div class="metric-value" data-key="dead_letters">0</div><div class="metric-subtle">Incidentes que requieren accion</div></article>
+        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Replays</div><div class="metric-value" data-key="replayed">0</div><div class="metric-subtle">Reintentos operativos ejecutados</div></article>
+        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Publicadas</div><div class="metric-value" data-key="published">0</div><div class="metric-subtle">Mensajes entregados al broker</div></article>
     </section>
     <section class="workspace">
         <article class="panel">
@@ -344,6 +420,10 @@
                 <button id="export-actions-button" class="secondary" type="button">Exportar acciones</button>
             </div>
             <div class="toolbar-summary">
+                <div>
+                    <strong>Bandeja operativa</strong>
+                    <span>Selecciona una tarea para abrir el contexto operativo, el lineage y las acciones disponibles.</span>
+                </div>
                 <div class="hint" id="filter-summary">Sin filtros activos.</div>
             </div>
             <div class="table-wrap">
@@ -762,7 +842,7 @@ function renderTasks() {
     }
 
     nodes.body.innerHTML = state.tasks.map(task => `
-        <tr data-task-id="${escapeHtml(task.id)}">
+        <tr data-task-id="${escapeHtml(task.id)}" class="${task.id === state.selectedTaskId ? 'is-selected' : ''}">
             <td class="task-id"><strong>${escapeHtml(task.id)}</strong><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
             <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!['failed', 'rejected'].includes(task.status) ? 'disabled' : ''}></td>
             <td><span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span></td>
@@ -793,6 +873,7 @@ function renderTasks() {
 async function showTask(taskId) {
     state.selectedTaskId = taskId;
     saveSelectedTaskId(taskId);
+    renderTasks();
 
     const [task, lineage] = await Promise.all([
         fetchJson(`/api/monitor/tasks/${taskId}?${buildTokenQuery().toString()}`),
@@ -835,7 +916,13 @@ function renderTaskDetail(task) {
         { label: 'Documento', value: escapeHtml(payload.document_id || '-'), className: 'code' },
         { label: 'Replay count', value: escapeHtml(replays) },
         { label: 'Parent task', value: escapeHtml(task.parent_task_id || '-'), className: 'code' },
-        { label: 'Error', value: escapeHtml(task.error_message || '-'), className: 'error', full: true },
+        {
+            label: 'Error',
+            value: task.error_message
+                ? `<details><summary>Ver detalle tecnico</summary><div class="detail-value error" style="margin-top:10px;">${escapeHtml(task.error_message)}</div></details>`
+                : '<div class="collapsed-note">Sin error registrado para la tarea activa.</div>',
+            full: true
+        },
     ];
 
     nodes.detailGrid.innerHTML = detailItems.map(item => {
