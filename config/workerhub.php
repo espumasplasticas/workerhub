@@ -82,4 +82,32 @@ return [
             explode(',', (string) env('WORKERHUB_NOTIFICATION_USER_IDS', ''))
         ))),
     ],
+
+    'processes' => [
+        'receipts' => [
+            'label' => 'Recibos',
+            'description' => 'Migraciones de recaudo y aplicaciones de recibo.',
+            'keywords' => ['recibo', 'recibos', 'cxc recibo', 'importarrecibos'],
+        ],
+        'sales_orders' => [
+            'label' => 'Pedidos',
+            'description' => 'Pedidos comerciales y sus reintentos.',
+            'keywords' => ['pedido', 'pedidos', 'order', 'sales order'],
+        ],
+        'invoices' => [
+            'label' => 'Facturas',
+            'description' => 'Facturas y documentos relacionados.',
+            'keywords' => ['factura', 'facturas', 'invoice', 'cxcfactura'],
+        ],
+        'customers' => [
+            'label' => 'Clientes',
+            'description' => 'Clientes, terceros y sucursales.',
+            'keywords' => ['cliente', 'clientes', 'tercero', 'terceros', 'sucursal'],
+        ],
+        'general' => [
+            'label' => 'General',
+            'description' => 'Procesos sin clasificacion explicita.',
+            'keywords' => [],
+        ],
+    ],
 ];

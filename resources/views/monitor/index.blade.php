@@ -173,6 +173,56 @@
         .metric-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
         .metric-value { font-size:36px; margin:8px 0 6px; font-family:"Instrument Sans","Segoe UI",sans-serif; }
         .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:14px; }
+        .process-rail {
+            display:grid;
+            grid-template-columns:repeat(5, minmax(0, 1fr));
+            gap:12px;
+            margin-bottom:16px;
+        }
+        .process-card {
+            padding:16px 18px;
+            border-radius:20px;
+            border:1px solid var(--line);
+            background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(245,249,255,.92));
+            box-shadow:var(--shadow);
+            cursor:pointer;
+            text-align:left;
+        }
+        .process-card.active {
+            border-color:rgba(21,102,232,.38);
+            background:linear-gradient(180deg, rgba(21,102,232,.1), rgba(255,255,255,.96));
+        }
+        .process-card small {
+            display:block;
+            margin-bottom:8px;
+            font-size:11px;
+            font-weight:800;
+            letter-spacing:.16em;
+            text-transform:uppercase;
+            color:var(--muted);
+        }
+        .process-card strong {
+            display:block;
+            margin-bottom:6px;
+            font-size:18px;
+            color:var(--navy);
+        }
+        .process-card span {
+            display:block;
+            font-size:13px;
+            line-height:1.5;
+            color:var(--muted);
+        }
+        .process-card .process-meta {
+            display:flex;
+            align-items:center;
+            justify-content:space-between;
+            gap:12px;
+            margin-top:12px;
+            font-size:12px;
+            color:var(--accent-strong);
+            font-weight:800;
+        }
         .workspace { display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(390px, .95fr); gap:16px; align-items:start; }
         .toolbar { display:grid; gap:10px; padding:18px; }
         .toolbar.primary, .toolbar.secondary { grid-template-columns:repeat(5, minmax(0,1fr)); border-bottom:1px solid var(--line); }
@@ -268,10 +318,10 @@
         .task-id strong { display:block; font-size:14px; line-height:1.4; }
         .task-id .mono { display:block; margin-top:4px; color:var(--muted); }
         .table-actions { display:flex; gap:8px; align-items:center; }
-        @media (max-width:1480px) { .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } }
-        @media (max-width:1280px) { .hero, .workspace { grid-template-columns:1fr; } .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } .detail { position:static; } }
+        @media (max-width:1480px) { .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .process-rail { grid-template-columns:repeat(3, minmax(0,1fr)); } }
+        @media (max-width:1280px) { .hero, .workspace { grid-template-columns:1fr; } .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .process-rail { grid-template-columns:repeat(2, minmax(0,1fr)); } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } .detail { position:static; } }
         @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; min-width:0; } .shell { width:min(100vw - 20px, 100%); } .toolbar-summary { flex-direction:column; align-items:flex-start; } }
-        @media (max-width:720px) { h1 { font-size:32px; } .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } }
+        @media (max-width:720px) { h1 { font-size:32px; } .process-rail, .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } }
     </style>
 </head>
 <body>
@@ -367,10 +417,30 @@
         <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Replays</div><div class="metric-value" data-key="replayed">0</div><div class="metric-subtle">Reintentos operativos ejecutados</div></article>
         <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Publicadas</div><div class="metric-value" data-key="published">0</div><div class="metric-subtle">Mensajes entregados al broker</div></article>
     </section>
+    <section class="process-rail" id="process-rail">
+        <button class="process-card active" type="button" data-process-key="">
+            <small>Bandeja</small>
+            <strong>Todos los procesos</strong>
+            <span>Vista global de las tareas recibidas desde Windows, API y replays.</span>
+            <div class="process-meta"><span id="process-all-total">0 tareas</span><span id="process-all-failed">0 incidentes</span></div>
+        </button>
+        @foreach (($processDefinitions ?? []) as $definition)
+            <button class="process-card" type="button" data-process-key="{{ $definition['key'] }}">
+                <small>Proceso</small>
+                <strong>{{ $definition['label'] }}</strong>
+                <span>{{ $definition['description'] ?? 'Sin descripcion operativa.' }}</span>
+                <div class="process-meta">
+                    <span data-process-total="{{ $definition['key'] }}">0 tareas</span>
+                    <span data-process-failed="{{ $definition['key'] }}">0 incidentes</span>
+                </div>
+            </button>
+        @endforeach
+    </section>
     <section class="workspace">
         <article class="panel">
             <div class="toolbar primary">
                 <input id="filter-source" type="text" placeholder="Origen: crm, erp, api">
+                <input id="filter-schedule-name" type="text" placeholder="Tarea programada: ImportarRecibos">
                 <select id="filter-status">
                     <option value="">Todos los estados</option>
                     <option value="received">received</option>
@@ -433,6 +503,8 @@
                         <th>Tarea</th>
                         <th></th>
                         <th>Estado</th>
+                        <th>Proceso</th>
+                        <th>Programada</th>
                         <th>Tipo</th>
                         <th>Origen</th>
                         <th>Queue</th>
@@ -441,7 +513,7 @@
                     </tr>
                     </thead>
                     <tbody id="tasks-body">
-                    <tr><td class="empty" colspan="8">Cargando tareas...</td></tr>
+                    <tr><td class="empty" colspan="10">Cargando tareas...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -490,11 +562,12 @@
 <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
 <script>
 window.workerhubOperatorToken = @json($operatorToken ?? '');
+window.workerhubProcessDefinitions = @json($processDefinitions ?? []);
 
 const FILTER_STORAGE_KEY = 'workerhub.monitor.filters';
 const TASK_STORAGE_KEY = 'workerhub.monitor.selected_task_id';
-const defaultFilters = { status: '', type: '', source: '', mode: 'all', priority: '', queue: '', date_from: '', date_to: '', replay_mode: 'all', error_mode: 'all' };
-const state = { filters: loadStoredFilters(), tasks: [], actions: [], lineage: null, selectedTaskId: loadStoredTaskId(), selectedIds: new Set(), echo: null, refreshTimer: null };
+const defaultFilters = { status: '', type: '', source: '', process_key: '', schedule_name: '', mode: 'all', priority: '', queue: '', date_from: '', date_to: '', replay_mode: 'all', error_mode: 'all' };
+const state = { filters: loadStoredFilters(), tasks: [], actions: [], lineage: null, selectedTaskId: loadStoredTaskId(), selectedIds: new Set(), echo: null, refreshTimer: null, summary: null };
 const nodes = {
     body: document.getElementById('tasks-body'),
     detailTitle: document.getElementById('detail-title'),
@@ -517,11 +590,13 @@ const nodes = {
     dispatchMode: document.getElementById('dispatch-mode'),
     backofficeState: document.getElementById('backoffice-state'),
     filterSummary: document.getElementById('filter-summary'),
+    processRail: document.getElementById('process-rail'),
     detailTabs: Array.from(document.querySelectorAll('[data-detail-tab]')),
     detailPanes: Array.from(document.querySelectorAll('[data-detail-pane]')),
 };
 const filterInputs = {
     source: document.getElementById('filter-source'),
+    schedule_name: document.getElementById('filter-schedule-name'),
     status: document.getElementById('filter-status'),
     type: document.getElementById('filter-type'),
     mode: document.getElementById('filter-mode'),
@@ -551,6 +626,17 @@ Object.entries(filterInputs).forEach(([key, input]) => {
     input.addEventListener('change', () => {
         state.filters[key] = input.value;
         saveFilters();
+        renderFilterSummary();
+        refreshAll(true);
+    });
+});
+
+nodes.processRail.querySelectorAll('[data-process-key]').forEach(button => {
+    button.addEventListener('click', () => {
+        state.filters.process_key = button.dataset.processKey || '';
+        saveFilters();
+        hydrateFilters();
+        renderProcessRail(state.summary);
         renderFilterSummary();
         refreshAll(true);
     });
@@ -692,6 +778,8 @@ function getTaskFilterPayload() {
         status: state.filters.status,
         type: state.filters.type,
         source: state.filters.source,
+        process_key: state.filters.process_key,
+        schedule_name: state.filters.schedule_name,
         priority: state.filters.priority,
         queue: state.filters.queue,
         date_from: state.filters.date_from,
@@ -742,6 +830,8 @@ function escapeHtml(value) {
 function renderFilterSummary() {
     const labels = [];
     if (state.filters.mode === 'dead_letters') labels.push('modo=DLQ');
+    if (state.filters.process_key) labels.push(`proceso=${state.filters.process_key}`);
+    if (state.filters.schedule_name) labels.push(`programada=${state.filters.schedule_name}`);
     if (state.filters.status) labels.push(`estado=${state.filters.status}`);
     if (state.filters.type) labels.push(`tipo=${state.filters.type}`);
     if (state.filters.source) labels.push(`origen=${state.filters.source}`);
@@ -753,6 +843,45 @@ function renderFilterSummary() {
     if (state.filters.date_to) labels.push(`hasta=${state.filters.date_to}`);
 
     nodes.filterSummary.textContent = labels.length === 0 ? 'Sin filtros activos.' : `Filtros activos: ${labels.join(' | ')}`;
+}
+
+function renderProcessRail(summary) {
+    const processSummary = Array.isArray(summary?.processes) ? summary.processes : [];
+    const byKey = new Map(processSummary.map(item => [item.key, item]));
+    const total = summary?.total ?? 0;
+    const failed = summary?.dead_letters ?? 0;
+
+    const allTotal = document.getElementById('process-all-total');
+    const allFailed = document.getElementById('process-all-failed');
+
+    if (allTotal) {
+        allTotal.textContent = `${total} tareas`;
+    }
+
+    if (allFailed) {
+        allFailed.textContent = `${failed} incidentes`;
+    }
+
+    nodes.processRail.querySelectorAll('[data-process-key]').forEach(button => {
+        const key = button.dataset.processKey || '';
+        button.classList.toggle('active', key === (state.filters.process_key || ''));
+
+        if (key === '') {
+            return;
+        }
+
+        const payload = byKey.get(key) || { total: 0, failed: 0 };
+        const totalNode = button.querySelector(`[data-process-total="${key}"]`);
+        const failedNode = button.querySelector(`[data-process-failed="${key}"]`);
+
+        if (totalNode) {
+            totalNode.textContent = `${payload.total || 0} tareas`;
+        }
+
+        if (failedNode) {
+            failedNode.textContent = `${payload.failed || 0} incidentes`;
+        }
+    });
 }
 
 function activateDetailTab(tab) {
@@ -777,9 +906,11 @@ async function refreshSummary() {
     const params = buildTokenQuery();
     params.set('silent', '1');
     const summary = await fetchJson(`/api/monitor/tasks/summary?${params.toString()}`);
+    state.summary = summary;
     document.querySelectorAll('[data-key]').forEach(node => {
         node.textContent = summary[node.dataset.key] ?? '0';
     });
+    renderProcessRail(summary);
 }
 
 async function refreshHealth() {
@@ -837,7 +968,7 @@ async function refreshActions() {
 
 function renderTasks() {
     if (state.tasks.length === 0) {
-        nodes.body.innerHTML = '<tr><td class="empty" colspan="8">No hay tareas para los filtros actuales.</td></tr>';
+        nodes.body.innerHTML = '<tr><td class="empty" colspan="10">No hay tareas para los filtros actuales.</td></tr>';
         return;
     }
 
@@ -846,6 +977,8 @@ function renderTasks() {
             <td class="task-id"><strong>${escapeHtml(task.id)}</strong><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
             <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!['failed', 'rejected'].includes(task.status) ? 'disabled' : ''}></td>
             <td><span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span></td>
+            <td><span class="${badgeClass('default')}">${escapeHtml(task.process_label || 'General')}</span></td>
+            <td>${escapeHtml(task.schedule_name || task.task_name || '-')}</td>
             <td>${escapeHtml(task.type)}</td>
             <td>${escapeHtml(task.source || '-')}</td>
             <td>${escapeHtml(task.queue || '-')}</td>
@@ -902,7 +1035,7 @@ function renderTaskDetail(task) {
 
     state.selectedTaskId = task.id;
     nodes.detailTitle.textContent = task.id;
-    nodes.detailSubtitle.textContent = `${task.type} - ${task.source || 'sin origen'} - ${task.kafka_topic || 'sin topic'}`;
+    nodes.detailSubtitle.textContent = `${task.process_label || 'General'} - ${task.schedule_name || task.task_name || 'sin tarea programada'} - ${task.source || 'sin origen'}`;
     nodes.retryButton.disabled = !['failed', 'rejected'].includes(task.status);
     nodes.openApiButton.disabled = false;
 
@@ -911,6 +1044,8 @@ function renderTaskDetail(task) {
     const detailItems = [
         { label: 'Estado', value: `<span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span>`, className: 'inline-badge' },
         { label: 'Prioridad', value: `<span class="${badgeClass(task.priority)}">${escapeHtml(task.priority || 'default')}</span>`, className: 'inline-badge' },
+        { label: 'Proceso', value: escapeHtml(task.process_label || 'General') },
+        { label: 'Programada', value: escapeHtml(task.schedule_name || task.task_name || '-') },
         { label: 'Cola', value: escapeHtml(task.queue || '-'), className: 'code' },
         { label: 'Intentos', value: escapeHtml(task.attempts ?? 0) },
         { label: 'Documento', value: escapeHtml(payload.document_id || '-'), className: 'code' },
@@ -945,7 +1080,7 @@ function renderLineageNode(node) {
     const children = Array.isArray(node.children) ? node.children : [];
     return `<div class="lineage-node ${node.is_selected ? 'selected' : ''}">
         <div class="lineage-header"><strong>${escapeHtml(node.id)}</strong><span class="${badgeClass(node.status)}">${escapeHtml(node.status)}</span></div>
-        <div class="lineage-meta">prioridad=${escapeHtml(node.priority || '-')} | queue=${escapeHtml(node.queue || '-')} | parent=${escapeHtml(node.parent_task_id || '-')}</div>
+        <div class="lineage-meta">proceso=${escapeHtml(node.process_label || 'General')} | programada=${escapeHtml(node.schedule_name || '-')} | prioridad=${escapeHtml(node.priority || '-')} | queue=${escapeHtml(node.queue || '-')} | parent=${escapeHtml(node.parent_task_id || '-')}</div>
         <div class="hint">solicitado=${escapeHtml(node.requested_at || '-')} | completado=${escapeHtml(node.completed_at || '-')} | fallido=${escapeHtml(node.failed_at || '-')}</div>
         ${node.error_message ? `<div class="hint">error=${escapeHtml(node.error_message)}</div>` : ''}
         ${children.map(child => renderLineageNode(child)).join('')}
@@ -995,7 +1130,7 @@ async function boot() {
 }
 
 boot().catch(error => {
-    nodes.body.innerHTML = `<tr><td class="empty" colspan="8">Error cargando monitor: ${escapeHtml(error.message)}</td></tr>`;
+    nodes.body.innerHTML = `<tr><td class="empty" colspan="10">Error cargando monitor: ${escapeHtml(error.message)}</td></tr>`;
     nodes.socketState.textContent = 'Error';
     nodes.socketDetail.textContent = error.message;
 });

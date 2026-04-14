@@ -26,8 +26,21 @@ class DocumentMigrationController extends Controller
             'lines.*' => ['required'],
             'source' => ['nullable', 'string'],
             'priority' => ['nullable', 'in:default,high'],
+            'process_key' => ['nullable', 'string'],
+            'process_label' => ['nullable', 'string'],
+            'schedule_name' => ['nullable', 'string'],
+            'task_name' => ['nullable', 'string'],
             'metadata' => ['nullable', 'array'],
         ]);
+
+        $metadata = $validated['metadata'] ?? [];
+        $metadata = is_array($metadata) ? $metadata : [];
+        $metadata = array_merge($metadata, array_filter([
+            'process_key' => $validated['process_key'] ?? null,
+            'process_label' => $validated['process_label'] ?? null,
+            'schedule_name' => $validated['schedule_name'] ?? null,
+            'task_name' => $validated['task_name'] ?? null,
+        ], static fn ($value) => is_string($value) && trim($value) !== ''));
 
         $taskId = (string) Str::uuid();
         $message = [
@@ -39,7 +52,7 @@ class DocumentMigrationController extends Controller
                 'document_id' => $validated['document_id'],
                 'lines' => array_map(static fn ($line) => (string) $line, $validated['lines']),
                 'source' => $validated['source'] ?? 'api',
-                'metadata' => $validated['metadata'] ?? [],
+                'metadata' => $metadata,
             ],
             'submitted_at' => now()->toIso8601String(),
         ];

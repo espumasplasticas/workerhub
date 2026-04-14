@@ -28,6 +28,10 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'source' => 'crm',
             'status' => 'completed',
             'priority' => 'default',
+            'metadata' => [
+                'process_key' => 'receipts',
+                'process_label' => 'Recibos',
+            ],
         ]);
 
         WorkerTask::query()->create([
@@ -36,6 +40,10 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'source' => 'erp',
             'status' => 'failed',
             'priority' => 'high',
+            'metadata' => [
+                'process_key' => 'sales_orders',
+                'process_label' => 'Pedidos',
+            ],
         ]);
 
         $response = $this->getJson('/api/monitor/tasks/summary');
@@ -45,7 +53,8 @@ class WorkerTaskMonitorControllerTest extends TestCase
                 'total' => 2,
                 'completed' => 1,
                 'failed' => 1,
-            ]);
+            ])
+            ->assertJsonPath('processes.0.key', 'receipts');
     }
 
     public function test_it_returns_socket_configuration_for_monitor_clients(): void
@@ -103,6 +112,10 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'source' => 'crm',
             'status' => 'failed',
             'priority' => 'default',
+            'metadata' => [
+                'process_key' => 'receipts',
+                'process_label' => 'Recibos',
+            ],
         ]);
 
         WorkerTask::query()->create([
@@ -111,13 +124,18 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'source' => 'crm',
             'status' => 'failed',
             'priority' => 'high',
+            'metadata' => [
+                'process_key' => 'invoices',
+                'process_label' => 'Facturas',
+            ],
         ]);
 
-        $response = $this->getJson('/api/monitor/tasks/export?status=failed&priority=high');
+        $response = $this->getJson('/api/monitor/tasks/export?status=failed&priority=high&process_key=invoices');
 
         $response->assertOk()
             ->assertJsonPath('count', 1)
-            ->assertJsonPath('items.0.id', 'task-export-high');
+            ->assertJsonPath('items.0.id', 'task-export-high')
+            ->assertJsonPath('items.0.process_label', 'Facturas');
 
         $this->assertDatabaseHas('worker_operation_logs', [
             'action' => 'monitor.tasks.export',
@@ -158,9 +176,17 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'type' => 'document_migration',
             'status' => 'failed',
             'priority' => 'default',
+            'metadata' => [
+                'process_key' => 'customers',
+                'process_label' => 'Clientes',
+                'schedule_name' => 'ImportarClientesCada10',
+            ],
         ]);
 
-        $this->getJson('/api/monitor/tasks/task-actions')->assertOk();
+        $this->getJson('/api/monitor/tasks/task-actions')
+            ->assertOk()
+            ->assertJsonPath('process_label', 'Clientes')
+            ->assertJsonPath('schedule_name', 'ImportarClientesCada10');
 
         $response = $this->getJson('/api/monitor/actions');
 

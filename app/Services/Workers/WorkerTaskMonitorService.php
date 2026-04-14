@@ -6,19 +6,27 @@ use App\Data\MonitorTaskFilters;
 use App\Events\WorkerTaskUpdated;
 use App\Models\WorkerTask;
 use App\Models\WorkerTaskEvent;
+use App\Support\WorkerTaskProcessCatalog;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Arr;
 
 class WorkerTaskMonitorService
 {
-    public function __construct(private readonly WorkerTaskNotificationService $notifications)
-    {
+    public function __construct(
+        private readonly WorkerTaskNotificationService $notifications,
+        private readonly WorkerTaskProcessCatalog $processCatalog
+    ) {
     }
 
     public function createTask(array $task, string $topic, ?string $key = null): WorkerTask
     {
         $payload = $task['payload'] ?? [];
+        $process = $this->processCatalog->resolve(
+            (string) ($task['type'] ?? ''),
+            is_array($payload) ? $payload : [],
+            Arr::get($payload, 'source')
+        );
 
         $record = WorkerTask::query()->create([
             'id' => $task['task_id'],
@@ -34,6 +42,10 @@ class WorkerTaskMonitorService
                 'headers' => $task['headers'] ?? [],
                 'submitted_at' => $task['submitted_at'] ?? null,
                 'replayed_from_task_id' => $task['parent_task_id'] ?? null,
+                'process_key' => $process['process_key'],
+                'process_label' => $process['process_label'],
+                'schedule_name' => $process['schedule_name'],
+                'task_name' => $process['task_name'],
             ],
             'requested_at' => now(),
         ]);
@@ -131,11 +143,40 @@ class WorkerTaskMonitorService
             ->all();
     }
 
-    public function getTask(string $taskId): WorkerTask
+    /**
+     * @return array<string, mixed>
+     */
+    public function getTask(string $taskId): array
     {
-        return WorkerTask::query()
+        $task = WorkerTask::query()
             ->with(['events', 'parent', 'replays', 'operationLogs'])
             ->findOrFail($taskId);
+
+        $payload = $this->serializeTask($task);
+        $payload['events'] = $task->events
+            ->map(fn (WorkerTaskEvent $event): array => [
+                'event' => $event->event,
+                'level' => $event->level,
+                'message' => $event->message,
+                'context' => $event->context,
+                'created_at' => $event->created_at?->toIso8601String(),
+            ])
+            ->all();
+        $payload['replays'] = $task->replays
+            ->map(fn (WorkerTask $replay): array => $this->serializeTask($replay))
+            ->all();
+        $payload['operation_logs'] = $task->operationLogs
+            ->map(fn ($log): array => [
+                'action' => $log->action,
+                'status' => $log->status,
+                'channel' => $log->channel,
+                'actor' => $log->actor,
+                'context' => $log->context,
+                'created_at' => $log->created_at?->toIso8601String(),
+            ])
+            ->all();
+
+        return $payload;
     }
 
     public function listDeadLetters(MonitorTaskFilters $filters, int $perPage = 25): LengthAwarePaginator
@@ -182,6 +223,28 @@ class WorkerTaskMonitorService
     public function summary(): array
     {
         $base = WorkerTask::query();
+        $processDefinitions = $this->processCatalog->definitions();
+        $tasks = (clone $base)->get(['status', 'metadata']);
+        $processSummary = [];
+
+        foreach ($processDefinitions as $definition) {
+            $key = (string) $definition['key'];
+            $processTasks = $tasks->filter(function (WorkerTask $task) use ($key): bool {
+                $metadata = is_array($task->metadata) ? $task->metadata : [];
+
+                return ($metadata['process_key'] ?? 'general') === $key;
+            });
+
+            $processSummary[] = [
+                'key' => $key,
+                'label' => (string) ($definition['label'] ?? $key),
+                'description' => $definition['description'] ?? null,
+                'total' => $processTasks->count(),
+                'failed' => $processTasks->whereIn('status', ['failed', 'rejected'])->count(),
+                'processing' => $processTasks->where('status', 'processing')->count(),
+                'completed' => $processTasks->where('status', 'completed')->count(),
+            ];
+        }
 
         return [
             'total' => (clone $base)->count(),
@@ -193,6 +256,7 @@ class WorkerTaskMonitorService
             'failed' => (clone $base)->whereIn('status', ['failed', 'rejected'])->count(),
             'dead_letters' => (clone $base)->whereIn('status', ['failed', 'rejected'])->count(),
             'replayed' => (clone $base)->whereNotNull('parent_task_id')->count(),
+            'processes' => $processSummary,
         ];
     }
 
@@ -283,6 +347,8 @@ class WorkerTaskMonitorService
             ->when($filters->status !== null, fn (Builder $query) => $query->where('status', $filters->status))
             ->when($filters->type !== null, fn (Builder $query) => $query->where('type', $filters->type))
             ->when($filters->source !== null, fn (Builder $query) => $query->where('source', $filters->source))
+            ->when($filters->processKey !== null, fn (Builder $query) => $query->where('metadata->process_key', $filters->processKey))
+            ->when($filters->scheduleName !== null, fn (Builder $query) => $query->where('metadata->schedule_name', 'like', '%' . $filters->scheduleName . '%'))
             ->when($filters->priority !== null, fn (Builder $query) => $query->where('priority', $filters->priority))
             ->when($filters->queue !== null, fn (Builder $query) => $query->where('queue', $filters->queue))
             ->when($filters->dateFrom !== null, fn (Builder $query) => $query->where('requested_at', '>=', $filters->dateFrom))
@@ -310,6 +376,10 @@ class WorkerTaskMonitorService
             'parent_task_id' => $task->parent_task_id,
             'type' => $task->type,
             'source' => $task->source,
+            'process_key' => is_array($task->metadata) ? ($task->metadata['process_key'] ?? 'general') : 'general',
+            'process_label' => is_array($task->metadata) ? ($task->metadata['process_label'] ?? 'General') : 'General',
+            'schedule_name' => is_array($task->metadata) ? ($task->metadata['schedule_name'] ?? null) : null,
+            'task_name' => is_array($task->metadata) ? ($task->metadata['task_name'] ?? null) : null,
             'status' => $task->status,
             'priority' => $task->priority,
             'queue' => $task->queue,
@@ -363,6 +433,9 @@ class WorkerTaskMonitorService
             'id' => $task->id,
             'parent_task_id' => $task->parent_task_id,
             'type' => $task->type,
+            'process_key' => is_array($task->metadata) ? ($task->metadata['process_key'] ?? 'general') : 'general',
+            'process_label' => is_array($task->metadata) ? ($task->metadata['process_label'] ?? 'General') : 'General',
+            'schedule_name' => is_array($task->metadata) ? ($task->metadata['schedule_name'] ?? null) : null,
             'status' => $task->status,
             'priority' => $task->priority,
             'queue' => $task->queue,

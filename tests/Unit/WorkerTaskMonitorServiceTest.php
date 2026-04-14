@@ -64,6 +64,11 @@ class WorkerTaskMonitorServiceTest extends TestCase
             'status' => 'failed',
             'priority' => 'default',
             'queue' => 'migration-default',
+            'metadata' => [
+                'process_key' => 'receipts',
+                'process_label' => 'Recibos',
+                'schedule_name' => 'ImportarRecibosCada1',
+            ],
             'requested_at' => now()->subDays(3),
         ]);
 
@@ -76,6 +81,11 @@ class WorkerTaskMonitorServiceTest extends TestCase
             'priority' => 'high',
             'queue' => 'migration-high',
             'error_message' => 'retry me',
+            'metadata' => [
+                'process_key' => 'receipts',
+                'process_label' => 'Recibos',
+                'schedule_name' => 'ImportarRecibosCada1',
+            ],
             'requested_at' => now()->subDay(),
         ]);
 
@@ -87,11 +97,18 @@ class WorkerTaskMonitorServiceTest extends TestCase
             'status' => 'completed',
             'priority' => 'high',
             'queue' => 'migration-high',
+            'metadata' => [
+                'process_key' => 'sales_orders',
+                'process_label' => 'Pedidos',
+                'schedule_name' => 'ImportarPedidosCada5',
+            ],
             'requested_at' => now()->subDay(),
         ]);
 
         $filters = MonitorTaskFilters::fromArray([
             'source' => 'crm',
+            'process_key' => 'receipts',
+            'schedule_name' => 'Recibos',
             'priority' => 'high',
             'queue' => 'migration-high',
             'replay_mode' => 'replays',
@@ -104,5 +121,37 @@ class WorkerTaskMonitorServiceTest extends TestCase
 
         $this->assertSame(1, $result->total());
         $this->assertSame('task-replay-hit', $result->items()[0]->getKey());
+    }
+
+    public function test_it_includes_process_summary_counts(): void
+    {
+        WorkerTask::query()->create([
+            'id' => 'task-receipt',
+            'type' => 'document_migration',
+            'status' => 'failed',
+            'priority' => 'default',
+            'metadata' => [
+                'process_key' => 'receipts',
+                'process_label' => 'Recibos',
+            ],
+        ]);
+
+        WorkerTask::query()->create([
+            'id' => 'task-invoice',
+            'type' => 'document_migration',
+            'status' => 'completed',
+            'priority' => 'default',
+            'metadata' => [
+                'process_key' => 'invoices',
+                'process_label' => 'Facturas',
+            ],
+        ]);
+
+        $summary = app(WorkerTaskMonitorService::class)->summary();
+        $processes = collect($summary['processes'])->keyBy('key');
+
+        $this->assertSame(1, $processes['receipts']['total']);
+        $this->assertSame(1, $processes['receipts']['failed']);
+        $this->assertSame(1, $processes['invoices']['completed']);
     }
 }
