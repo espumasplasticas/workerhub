@@ -14,6 +14,12 @@ return [
             'tries' => (int) env('WORKERHUB_DOCUMENT_MIGRATION_TRIES', 3),
             'timeout' => (int) env('WORKERHUB_DOCUMENT_MIGRATION_TIMEOUT', 300),
         ],
+        'receipt_migration' => [
+            'queue' => env('WORKERHUB_RECEIPT_MIGRATION_QUEUE', env('WORKERHUB_DOCUMENT_MIGRATION_QUEUE', 'migration-default')),
+            'high_priority_queue' => env('WORKERHUB_RECEIPT_MIGRATION_HIGH_QUEUE', env('WORKERHUB_DOCUMENT_MIGRATION_HIGH_QUEUE', 'migration-high')),
+            'tries' => (int) env('WORKERHUB_RECEIPT_MIGRATION_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_RECEIPT_MIGRATION_TIMEOUT', 300),
+        ],
     ],
 
     'kafka' => [
@@ -81,6 +87,17 @@ return [
             static fn (string $value) => trim($value) === '' ? null : (int) trim($value),
             explode(',', (string) env('WORKERHUB_NOTIFICATION_USER_IDS', ''))
         ))),
+    ],
+
+    'receipts' => [
+        'source_connections' => [
+            'sqlsrv' => env('WORKERHUB_RECEIPT_SOURCE_SQLSRV_CONNECTION', 'source_sqlsrv'),
+            'test' => env('WORKERHUB_RECEIPT_SOURCE_TEST_CONNECTION', 'source_test'),
+        ],
+        'views' => [
+            'header' => env('WORKERHUB_RECEIPT_HEADER_VIEW', 'prototipos.v_prototipos_recibos_encabezado_sala_ventas'),
+            'payments' => env('WORKERHUB_RECEIPT_PAYMENTS_VIEW', 'prototipos.v_prototipos_recibos_caja'),
+        ],
     ],
 
     'processes' => [

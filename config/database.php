@@ -120,6 +120,48 @@ return [
             ]),
         ],
 
+        'source_sqlsrv' => [
+            'driver' => 'sqlsrv',
+            'url' => env('DATABASE_URL'),
+            'host' => env('SOURCE_SQLSRV_HOST', env('DB_HOST', 'localhost')),
+            'port' => env('SOURCE_SQLSRV_PORT', env('DB_PORT', '1433')),
+            'database' => env('SOURCE_SQLSRV_DATABASE', 'comodisimos'),
+            'username' => env('SOURCE_SQLSRV_USERNAME', env('DB_USERNAME', 'forge')),
+            'password' => env('SOURCE_SQLSRV_PASSWORD', env('DB_PASSWORD', '')),
+            'charset' => 'utf8',
+            'pooling' => env('DB_SQLSRV_POOLING', false),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('SOURCE_SQLSRV_ENCRYPT', env('DB_ENCRYPT', 'no')),
+            'trust_server_certificate' => env('SOURCE_SQLSRV_TRUST_SERVER_CERTIFICATE', env('DB_TRUST_SERVER_CERTIFICATE', true)),
+            'options' => array_filter([
+                'LoginTimeout' => env('SOURCE_SQLSRV_LOGIN_TIMEOUT', env('DB_LOGIN_TIMEOUT', 30)),
+                'ConnectRetryCount' => env('SOURCE_SQLSRV_CONNECT_RETRY_COUNT', env('DB_CONNECT_RETRY_COUNT', 3)),
+                'ConnectRetryInterval' => env('SOURCE_SQLSRV_CONNECT_RETRY_INTERVAL', env('DB_CONNECT_RETRY_INTERVAL', 10)),
+            ]),
+        ],
+
+        'source_test' => [
+            'driver' => 'sqlsrv',
+            'url' => env('DATABASE_URL'),
+            'host' => env('SOURCE_TEST_HOST', env('SOURCE_SQLSRV_HOST', env('DB_HOST', 'localhost'))),
+            'port' => env('SOURCE_TEST_PORT', env('SOURCE_SQLSRV_PORT', env('DB_PORT', '1433'))),
+            'database' => env('SOURCE_TEST_DATABASE', env('SOURCE_SQLSRV_DATABASE', 'comodisimos')),
+            'username' => env('SOURCE_TEST_USERNAME', env('SOURCE_SQLSRV_USERNAME', env('DB_USERNAME', 'forge'))),
+            'password' => env('SOURCE_TEST_PASSWORD', env('SOURCE_SQLSRV_PASSWORD', env('DB_PASSWORD', ''))),
+            'charset' => 'utf8',
+            'pooling' => env('DB_SQLSRV_POOLING', false),
+            'prefix' => '',
+            'prefix_indexes' => true,
+            'encrypt' => env('SOURCE_TEST_ENCRYPT', env('SOURCE_SQLSRV_ENCRYPT', env('DB_ENCRYPT', 'no'))),
+            'trust_server_certificate' => env('SOURCE_TEST_TRUST_SERVER_CERTIFICATE', env('SOURCE_SQLSRV_TRUST_SERVER_CERTIFICATE', env('DB_TRUST_SERVER_CERTIFICATE', true))),
+            'options' => array_filter([
+                'LoginTimeout' => env('SOURCE_TEST_LOGIN_TIMEOUT', env('SOURCE_SQLSRV_LOGIN_TIMEOUT', env('DB_LOGIN_TIMEOUT', 30))),
+                'ConnectRetryCount' => env('SOURCE_TEST_CONNECT_RETRY_COUNT', env('SOURCE_SQLSRV_CONNECT_RETRY_COUNT', env('DB_CONNECT_RETRY_COUNT', 3))),
+                'ConnectRetryInterval' => env('SOURCE_TEST_CONNECT_RETRY_INTERVAL', env('SOURCE_SQLSRV_CONNECT_RETRY_INTERVAL', env('DB_CONNECT_RETRY_INTERVAL', 10))),
+            ]),
+        ],
+
     ],
 
     /*

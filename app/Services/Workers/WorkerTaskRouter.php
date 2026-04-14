@@ -7,8 +7,10 @@ use InvalidArgumentException;
 
 class WorkerTaskRouter
 {
-    public function __construct(private readonly DocumentMigrationService $documentMigrationService)
-    {
+    public function __construct(
+        private readonly DocumentMigrationService $documentMigrationService,
+        private readonly ReceiptMigrationService $receiptMigrationService
+    ) {
     }
 
     public function resolveQueue(array $task): string
@@ -20,6 +22,9 @@ class WorkerTaskRouter
             'document_migration' => $priority === 'high'
                 ? (string) config('workerhub.tasks.document_migration.high_priority_queue')
                 : (string) config('workerhub.tasks.document_migration.queue'),
+            'receipt_migration' => $priority === 'high'
+                ? (string) config('workerhub.tasks.receipt_migration.high_priority_queue')
+                : (string) config('workerhub.tasks.receipt_migration.queue'),
             default => (string) config('workerhub.queues.default'),
         };
     }
@@ -28,6 +33,7 @@ class WorkerTaskRouter
     {
         return match ((string) ($task['type'] ?? '')) {
             'document_migration' => (int) config('workerhub.tasks.document_migration.tries', 3),
+            'receipt_migration' => (int) config('workerhub.tasks.receipt_migration.tries', 3),
             default => 3,
         };
     }
@@ -36,6 +42,7 @@ class WorkerTaskRouter
     {
         return match ((string) ($task['type'] ?? '')) {
             'document_migration' => (int) config('workerhub.tasks.document_migration.timeout', 300),
+            'receipt_migration' => (int) config('workerhub.tasks.receipt_migration.timeout', 300),
             default => 180,
         };
     }
@@ -51,6 +58,7 @@ class WorkerTaskRouter
 
         return match ($type) {
             'document_migration' => $this->documentMigrationService->handle($payload),
+            'receipt_migration' => $this->receiptMigrationService->handle($payload),
             default => throw new InvalidArgumentException(sprintf('Tipo de tarea no soportado: %s', $type)),
         };
     }
