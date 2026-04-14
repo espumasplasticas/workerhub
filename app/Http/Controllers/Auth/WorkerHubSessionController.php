@@ -41,6 +41,19 @@ class WorkerHubSessionController extends Controller
         );
 
         if (!$result->reachable) {
+            if ($this->canUseDevelopmentBypass()) {
+                $this->operatorSession->storeDevelopmentBypass($request, $credentials['username']);
+                $request->attributes->set('workerhub_actor', $credentials['username']);
+                $request->attributes->set('workerhub_access_channel', 'local_bypass');
+
+                $this->operationLogs->record($request, 'auth.login.local_bypass', 'success', null, [
+                    'username' => $credentials['username'],
+                    'reason' => 'backoffice_unavailable',
+                ]);
+
+                return redirect()->intended(route('monitor.dashboard'));
+            }
+
             $this->operationLogs->record($request, 'auth.login.failed', 'failed', null, [
                 'reason' => 'backoffice_unavailable',
                 'message' => $result->message,
@@ -104,5 +117,11 @@ class WorkerHubSessionController extends Controller
         $request->session()->regenerateToken();
 
         return redirect()->route('workerhub.login');
+    }
+
+    private function canUseDevelopmentBypass(): bool
+    {
+        return (bool) config('workerhub.operations.allow_local_bypass', true)
+            && app()->environment(['local', 'testing']);
     }
 }

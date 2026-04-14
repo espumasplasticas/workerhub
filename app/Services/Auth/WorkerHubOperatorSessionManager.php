@@ -46,6 +46,24 @@ class WorkerHubOperatorSessionManager
         $request->session()->regenerate();
     }
 
+    public function storeDevelopmentBypass(Request $request, string $username): void
+    {
+        if (!$request->hasSession()) {
+            return;
+        }
+
+        $request->session()->put($this->sessionKey(), [
+            'id' => null,
+            'email' => trim($username) !== '' ? trim($username) : 'local-bypass',
+            'name' => 'Operador desarrollo',
+            'authorized' => true,
+            'role_id' => (int) config('workerhub.backoffice.admin_role_id', 20),
+            'authenticated_at' => now()->toIso8601String(),
+            'access_channel' => 'local_bypass',
+        ]);
+        $request->session()->regenerate();
+    }
+
     /**
      * @return array<string, mixed>|null
      */

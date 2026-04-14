@@ -4,6 +4,7 @@ namespace Tests\Feature;
 
 use App\Contracts\BackofficeAuthClientInterface;
 use App\Data\Auth\BackofficeAuthResult;
+use App\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Mockery;
 use Tests\TestCase;
@@ -20,6 +21,7 @@ class WorkerHubAuthenticationTest extends TestCase
 
     public function test_it_logs_in_an_authorized_backoffice_operator(): void
     {
+        $this->withoutMiddleware(VerifyCsrfToken::class);
         config()->set('workerhub.operations.allow_local_bypass', false);
 
         $client = Mockery::mock(BackofficeAuthClientInterface::class);
@@ -59,6 +61,7 @@ class WorkerHubAuthenticationTest extends TestCase
 
     public function test_it_rejects_user_without_backoffice_admin_role(): void
     {
+        $this->withoutMiddleware(VerifyCsrfToken::class);
         config()->set('workerhub.operations.allow_local_bypass', false);
 
         $client = Mockery::mock(BackofficeAuthClientInterface::class);
@@ -93,6 +96,7 @@ class WorkerHubAuthenticationTest extends TestCase
 
     public function test_it_logs_out_an_authenticated_operator(): void
     {
+        $this->withoutMiddleware(VerifyCsrfToken::class);
         config()->set('workerhub.operations.allow_local_bypass', false);
 
         $response = $this->withSession([

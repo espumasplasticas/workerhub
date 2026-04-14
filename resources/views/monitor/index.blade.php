@@ -6,25 +6,25 @@
     <title>WorkerHub Monitor</title>
     <style>
         :root {
-            --bg:#e8f1ff;
+            --bg:#edf4ff;
             --panel:rgba(255,255,255,.94);
             --panel-strong:#ffffff;
-            --ink:#10203d;
-            --muted:#61759b;
-            --accent:#1566e8;
-            --accent-strong:#0f4faf;
-            --accent-soft:rgba(21,102,232,.10);
-            --warn:#c57a17;
-            --warn-soft:rgba(244,176,56,.18);
-            --danger:#c83d60;
-            --danger-soft:rgba(200,61,96,.12);
-            --success:#148a63;
-            --success-soft:rgba(20,138,99,.12);
-            --navy:#0b2250;
-            --navy-soft:#15386d;
-            --line:rgba(23,78,165,.12);
-            --line-strong:rgba(23,78,165,.2);
-            --shadow:0 24px 60px rgba(10,34,80,.14);
+            --ink:#13294d;
+            --muted:#6880a8;
+            --accent:#1d69e2;
+            --accent-strong:#0e4fb7;
+            --accent-soft:rgba(29,105,226,.10);
+            --warn:#c68414;
+            --warn-soft:rgba(230,178,65,.16);
+            --danger:#ca4266;
+            --danger-soft:rgba(202,66,102,.12);
+            --success:#138769;
+            --success-soft:rgba(19,135,105,.12);
+            --navy:#0c2146;
+            --navy-soft:#153567;
+            --line:rgba(28,78,156,.12);
+            --line-strong:rgba(28,78,156,.2);
+            --shadow:0 26px 70px rgba(9,35,78,.12);
         }
         * { box-sizing:border-box; }
         html, body { overflow-x:hidden; }
@@ -33,21 +33,21 @@
             font-family:"Manrope","Segoe UI",sans-serif;
             color:var(--ink);
             background:
-                radial-gradient(circle at top left, rgba(21,102,232,.24), transparent 24%),
-                radial-gradient(circle at top right, rgba(88,156,255,.18), transparent 20%),
-                linear-gradient(180deg, #f6f9ff 0%, var(--bg) 100%);
+                radial-gradient(circle at top left, rgba(29,105,226,.18), transparent 24%),
+                radial-gradient(circle at 85% 0%, rgba(115,179,255,.14), transparent 22%),
+                linear-gradient(180deg, #f7faff 0%, var(--bg) 100%);
         }
-        .shell { width:min(1680px, calc(100vw - 32px)); margin:0 auto; padding:20px 0 36px; }
-        .topbar { margin-bottom:18px; }
+        .shell { width:min(1580px, calc(100vw - 28px)); margin:0 auto; padding:16px 0 28px; }
+        .topbar { margin-bottom:14px; }
         .topbar-card {
             display:flex;
             align-items:center;
             justify-content:space-between;
-            gap:18px;
-            padding:18px 22px;
+            gap:16px;
+            padding:16px 20px;
             border:1px solid rgba(255,255,255,.12);
-            border-radius:24px;
-            background:linear-gradient(135deg, rgba(11,34,80,.96), rgba(21,56,109,.92));
+            border-radius:22px;
+            background:linear-gradient(135deg, rgba(11,34,80,.97), rgba(17,54,110,.94));
             box-shadow:var(--shadow);
             backdrop-filter:blur(16px);
         }
@@ -70,7 +70,7 @@
         }
         .brand-copy strong {
             display:block;
-            font-size:24px;
+            font-size:22px;
             line-height:1;
             font-family:"Instrument Sans","Segoe UI",sans-serif;
             color:#fff;
@@ -108,40 +108,39 @@
             min-width:180px;
         }
         .operator-chip strong { display:block; color:#fff; }
-        .hero { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(320px, .85fr); gap:16px; margin-bottom:18px; align-items:stretch; }
-        .panel { background:var(--panel); border:1px solid var(--line); border-radius:24px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
-        .headline { padding:24px 26px; background:linear-gradient(155deg, rgba(11,34,80,.97), rgba(19,57,114,.92)); color:#fff; }
-        .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:12px; color:var(--muted); margin-bottom:10px; font-weight:700; }
-        .headline .eyebrow { color:rgba(223,235,255,.72); }
-        h1 { margin:0 0 10px; font-size:40px; line-height:1; font-family:"Instrument Sans","Segoe UI",sans-serif; max-width:11ch; }
-        .lead { margin:0; color:rgba(235,243,255,.82); font-size:15px; line-height:1.65; max-width:70ch; }
-        .headline-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:18px; }
+        .hero { display:grid; grid-template-columns:minmax(0, 1fr); gap:12px; margin-bottom:12px; align-items:stretch; }
+        .panel { background:var(--panel); border:1px solid var(--line); border-radius:22px; box-shadow:var(--shadow); backdrop-filter:blur(14px); }
+        .headline { padding:18px 20px; background:linear-gradient(180deg, rgba(255,255,255,.96), rgba(244,248,255,.98)); color:var(--ink); }
+        .eyebrow { text-transform:uppercase; letter-spacing:.18em; font-size:11px; color:var(--muted); margin-bottom:10px; font-weight:700; }
+        .headline .eyebrow { color:var(--muted); }
+        h1 { margin:0 0 8px; font-size:26px; line-height:1.08; font-family:"Instrument Sans","Segoe UI",sans-serif; max-width:none; color:var(--navy); }
+        .lead { margin:0; color:var(--muted); font-size:14px; line-height:1.6; max-width:88ch; }
+        .headline-meta { display:flex; flex-wrap:wrap; gap:10px; margin-top:14px; }
         .headline-pill {
             display:inline-flex;
             align-items:center;
             gap:8px;
-            min-height:40px;
-            padding:0 14px;
+            min-height:34px;
+            padding:0 13px;
             border-radius:999px;
-            border:1px solid rgba(255,255,255,.14);
-            background:rgba(255,255,255,.08);
-            color:#f4f8ff;
-            font-size:13px;
+            border:1px solid var(--line);
+            background:#f7faff;
+            color:var(--ink);
+            font-size:12px;
             font-weight:700;
         }
-        .status-box { padding:20px; display:flex; flex-direction:column; justify-content:space-between; background:linear-gradient(160deg, rgba(255,255,255,.96), rgba(241,247,255,.94)); }
-        .status-dot { display:inline-flex; align-items:center; gap:8px; font-size:14px; color:var(--muted); }
-        .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 6px rgba(13,98,214,.10); }
-        .status-grid { display:grid; grid-template-columns:1fr; gap:10px; margin-top:18px; }
+        .status-dot { display:inline-flex; align-items:center; gap:8px; font-size:13px; color:var(--muted); margin-top:16px; }
+        .status-dot::before { content:""; width:10px; height:10px; border-radius:50%; background:#60b6ff; box-shadow:0 0 0 6px rgba(96,182,255,.12); }
+        .status-grid { display:grid; grid-template-columns:repeat(3, minmax(0,1fr)); gap:10px; margin-top:12px; }
         .status-pill {
-            padding:14px 16px;
-            border-radius:18px;
-            border:1px solid var(--line-strong);
-            background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(246,250,255,.92));
+            padding:12px 14px;
+            border-radius:16px;
+            border:1px solid var(--line);
+            background:#fbfdff;
         }
         .status-pill span {
             display:block;
-            font-size:12px;
+            font-size:11px;
             letter-spacing:.12em;
             text-transform:uppercase;
             color:var(--muted);
@@ -150,107 +149,115 @@
         }
         .status-pill strong {
             display:block;
-            font-size:24px;
+            font-size:18px;
             line-height:1.1;
-            color:var(--ink);
+            color:var(--navy);
             margin-bottom:4px;
         }
         .status-pill small {
             display:block;
             color:var(--muted);
-            font-size:13px;
+            font-size:12px;
             line-height:1.5;
         }
-        .cards { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:14px; margin-bottom:16px; }
-        .metric { padding:18px; min-height:108px; background:linear-gradient(180deg, rgba(255,255,255,.88), rgba(246,250,255,.92)); }
+        .cards { display:grid; grid-template-columns:repeat(4, minmax(0,1fr)); gap:10px; margin-bottom:10px; }
+        .metric { padding:14px 16px; min-height:92px; background:linear-gradient(180deg, rgba(255,255,255,.9), rgba(246,250,255,.92)); }
         .metric-keyline {
-            width:46px;
-            height:4px;
+            width:34px;
+            height:3px;
             border-radius:999px;
-            margin-bottom:12px;
+            margin-bottom:10px;
             background:linear-gradient(90deg, var(--accent), #5ab7ff);
         }
-        .metric-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
-        .metric-value { font-size:36px; margin:8px 0 6px; font-family:"Instrument Sans","Segoe UI",sans-serif; }
-        .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:14px; }
-        .process-rail {
-            display:grid;
-            grid-template-columns:repeat(5, minmax(0, 1fr));
-            gap:12px;
-            margin-bottom:16px;
-        }
-        .process-card {
-            padding:16px 18px;
-            border-radius:20px;
-            border:1px solid var(--line);
-            background:linear-gradient(180deg, rgba(255,255,255,.92), rgba(245,249,255,.92));
-            box-shadow:var(--shadow);
-            cursor:pointer;
-            text-align:left;
-        }
-        .process-card.active {
-            border-color:rgba(21,102,232,.38);
-            background:linear-gradient(180deg, rgba(21,102,232,.1), rgba(255,255,255,.96));
-        }
-        .process-card small {
-            display:block;
-            margin-bottom:8px;
-            font-size:11px;
-            font-weight:800;
-            letter-spacing:.16em;
-            text-transform:uppercase;
-            color:var(--muted);
-        }
-        .process-card strong {
-            display:block;
-            margin-bottom:6px;
-            font-size:18px;
-            color:var(--navy);
-        }
-        .process-card span {
-            display:block;
-            font-size:13px;
-            line-height:1.5;
-            color:var(--muted);
-        }
-        .process-card .process-meta {
+        .metric-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; }
+        .metric-value { font-size:30px; margin:6px 0 4px; font-family:"Instrument Sans","Segoe UI",sans-serif; }
+        .metric-subtle, .hint, .lineage-meta { color:var(--muted); font-size:13px; }
+        .process-footer {
             display:flex;
             align-items:center;
             justify-content:space-between;
             gap:12px;
-            margin-top:12px;
-            font-size:12px;
-            color:var(--accent-strong);
-            font-weight:800;
+            flex-wrap:wrap;
+            margin:0 16px 16px;
+            padding-top:14px;
+            border-top:1px solid var(--line);
         }
-        .workspace { display:grid; grid-template-columns:minmax(0, 1.45fr) minmax(390px, .95fr); gap:16px; align-items:start; }
-        .toolbar { display:grid; gap:10px; padding:18px; }
-        .toolbar.primary, .toolbar.secondary { grid-template-columns:repeat(5, minmax(0,1fr)); border-bottom:1px solid var(--line); }
-        .toolbar.actions { grid-template-columns:repeat(4, minmax(0,1fr)); }
-        .toolbar input, .toolbar select, .toolbar button, .actions button { border:1px solid var(--line); border-radius:14px; padding:12px 14px; font:inherit; background:#fff; color:var(--ink); }
-        .toolbar button, .actions button { background:var(--accent); border-color:var(--accent); color:#fff; cursor:pointer; }
+        .process-footer-copy strong {
+            display:block;
+            margin-bottom:4px;
+            font-size:14px;
+            color:var(--navy);
+        }
+        .process-footer-copy span {
+            display:block;
+            font-size:12px;
+            color:var(--muted);
+        }
+        .process-pills {
+            display:flex;
+            align-items:center;
+            gap:8px;
+            flex-wrap:wrap;
+        }
+        .process-pill {
+            display:inline-flex;
+            align-items:center;
+            min-height:32px;
+            padding:0 12px;
+            border-radius:999px;
+            border:1px solid var(--line);
+            background:#f7faff;
+            color:var(--accent-strong);
+            font-size:12px;
+            font-weight:700;
+        }
+        .workspace { display:grid; grid-template-columns:minmax(0, 1fr); gap:14px; align-items:start; }
+        .workspace > article.panel { overflow:hidden; }
+        .toolbar { display:grid; gap:12px; padding:14px 16px; }
+        .toolbar.primary, .toolbar.secondary { grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); border-bottom:1px solid var(--line); }
+        .toolbar.actions { grid-template-columns:repeat(auto-fit, minmax(170px, 1fr)); padding-top:8px; }
+        .field { display:flex; flex-direction:column; gap:6px; }
+        .field label { font-size:11px; font-weight:800; letter-spacing:.12em; text-transform:uppercase; color:var(--muted); }
+        .toolbar input, .toolbar select, .toolbar button, .actions button {
+            min-height:46px;
+            border:1px solid var(--line);
+            border-radius:14px;
+            padding:0 14px;
+            font:inherit;
+            background:#fff;
+            color:var(--ink);
+            box-shadow:0 1px 0 rgba(255,255,255,.8), inset 0 1px 0 rgba(255,255,255,.75);
+        }
+        .toolbar input:focus, .toolbar select:focus {
+            outline:none;
+            border-color:rgba(29,105,226,.34);
+            box-shadow:0 0 0 4px rgba(29,105,226,.08);
+            background:#fff;
+        }
+        .toolbar button, .actions button { background:var(--accent); border-color:var(--accent); color:#fff; cursor:pointer; font-weight:700; }
         .toolbar button.secondary, .actions button.secondary { background:#fff; color:var(--ink); border-color:var(--line); }
         .toolbar-summary {
             display:flex;
             align-items:center;
             justify-content:space-between;
             gap:16px;
-            padding:0 18px 18px;
+            padding:6px 16px 14px;
             border-bottom:1px solid var(--line);
         }
         .toolbar-summary strong {
             display:block;
             margin-bottom:4px;
-            font-size:15px;
+            font-size:16px;
             color:var(--navy);
         }
         .toolbar-summary span { display:block; font-size:13px; color:var(--muted); }
-        .table-wrap { overflow:auto; max-height:760px; }
+        .table-wrap { overflow:auto; max-height:680px; background:#fff; }
         table { width:100%; border-collapse:collapse; }
-        th, td { padding:14px 18px; text-align:left; border-bottom:1px solid rgba(26,90,176,.10); vertical-align:top; }
-        th { position:sticky; top:0; background:var(--panel); font-size:12px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
-        tr:hover td { background:rgba(13,98,214,.04); }
-        tr.is-selected td { background:rgba(13,98,214,.08); }
+        th, td { padding:13px 16px; text-align:left; border-bottom:1px solid rgba(26,90,176,.08); vertical-align:top; }
+        th { position:sticky; top:0; background:#f5f8fd; font-size:11px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); z-index:1; }
+        tbody tr:nth-child(even) td { background:rgba(245,248,253,.72); }
+        tr:hover td { background:rgba(13,98,214,.05); }
+        tr.is-selected td { background:rgba(13,98,214,.10); }
         .badge { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; letter-spacing:.04em; }
         .badge.received, .badge.published, .badge.queued, .badge.processing { background:var(--accent-soft); color:var(--accent); }
         .badge.completed { background:var(--success-soft); color:var(--success); }
@@ -259,12 +266,72 @@
         .badge.high { background:var(--warn-soft); color:var(--warn); }
         .mono { font-family:Consolas, Monaco, monospace; font-size:12px; }
         .checkbox { width:16px; height:16px; accent-color:var(--accent); }
-        .detail { padding:22px; position:sticky; top:18px; }
-        .detail h2 { margin-top:0; font-size:26px; }
-        .detail-tabs { display:flex; gap:8px; flex-wrap:wrap; margin:16px 0 18px; }
-        .detail-tab {
+        .detail-modal {
+            position:fixed;
+            inset:0;
+            display:none;
+            align-items:center;
+            justify-content:center;
+            padding:24px;
+            z-index:60;
+        }
+        .detail-modal.is-open { display:flex; }
+        .detail-backdrop {
+            position:absolute;
+            inset:0;
+            background:rgba(8,18,39,.42);
+            backdrop-filter:blur(4px);
+        }
+        .detail-dialog {
+            position:relative;
+            width:min(1120px, calc(100vw - 48px));
+            max-height:calc(100vh - 48px);
+            overflow:auto;
+            border-radius:24px;
+            border:1px solid var(--line);
+            background:linear-gradient(180deg, rgba(255,255,255,.99), rgba(247,250,255,.98));
+            box-shadow:0 30px 70px rgba(8,18,39,.24);
+        }
+        .detail-header {
+            display:flex;
+            align-items:flex-start;
+            justify-content:space-between;
+            gap:16px;
+            padding:20px 20px 0;
+        }
+        .detail-close {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-width:40px;
+            height:40px;
+            border-radius:999px;
             border:1px solid var(--line);
             background:#fff;
+            color:var(--navy);
+            font:inherit;
+            font-size:20px;
+            cursor:pointer;
+        }
+        .detail {
+            padding:0 20px 20px;
+            color:var(--ink);
+        }
+        .detail h2 { margin-top:0; font-size:28px; line-height:1.08; color:var(--navy); }
+        .detail .eyebrow, .detail .hint, .detail .lineage-meta { color:var(--muted); }
+        .detail-tabs {
+            display:inline-flex;
+            gap:8px;
+            flex-wrap:wrap;
+            margin:16px 0 18px;
+            padding:6px;
+            border-radius:999px;
+            background:#eef4ff;
+            border:1px solid var(--line);
+        }
+        .detail-tab {
+            border:0;
+            background:transparent;
             color:var(--muted);
             border-radius:999px;
             padding:10px 14px;
@@ -277,25 +344,31 @@
         }
         .detail-tab.active {
             background:var(--accent);
-            border-color:var(--accent);
             color:#fff;
         }
         .detail-pane { display:none; }
         .detail-pane.active { display:block; }
         .detail-grid { display:grid; grid-template-columns:repeat(2, minmax(0,1fr)); gap:12px; margin-bottom:18px; }
-        .detail-card { padding:14px; border-radius:16px; border:1px solid var(--line); background:#fff; min-width:0; }
+        .detail-card {
+            padding:14px;
+            border-radius:16px;
+            border:1px solid var(--line);
+            background:#fff;
+            min-width:0;
+            box-shadow:0 8px 18px rgba(11,38,82,.05);
+        }
         .detail-card.full { grid-column:1 / -1; }
-        .detail-label { font-size:12px; color:var(--muted); text-transform:uppercase; letter-spacing:.12em; margin-bottom:6px; }
-        .detail-value { font-size:15px; font-weight:600; min-width:0; overflow-wrap:anywhere; word-break:break-word; }
-        .detail-value.code { font-family:Consolas, Monaco, monospace; font-size:12px; font-weight:600; }
-        .detail-value.error { max-height:220px; overflow:auto; padding:10px 12px; border-radius:12px; background:var(--danger-soft); color:#8e2039; }
+        .detail-label { font-size:11px; color:var(--muted); text-transform:uppercase; letter-spacing:.14em; margin-bottom:6px; }
+        .detail-value { font-size:15px; font-weight:600; min-width:0; overflow-wrap:anywhere; word-break:break-word; color:var(--navy); }
+        .detail-value.code { font-family:Consolas, Monaco, monospace; font-size:12px; font-weight:600; color:var(--navy); }
+        .detail-value.error { max-height:240px; overflow:auto; padding:10px 12px; border-radius:12px; background:rgba(202,66,102,.10); color:#8a2844; }
         .detail-value.inline-badge { display:flex; align-items:center; flex-wrap:wrap; gap:8px; }
         .collapsed-note {
             margin-top:10px;
             padding:12px 14px;
             border:1px dashed var(--line-strong);
             border-radius:14px;
-            background:rgba(20,99,226,.04);
+            background:#f8fbff;
             color:var(--muted);
             font-size:13px;
             line-height:1.5;
@@ -304,24 +377,39 @@
             cursor:pointer;
             font-size:13px;
             font-weight:800;
-            color:var(--accent-strong);
+            color:var(--accent);
             letter-spacing:.04em;
         }
         .stream { margin-top:16px; border-top:1px solid var(--line); padding-top:16px; }
         .stream-item { padding:12px 0; border-bottom:1px dashed var(--line); }
         .stream-item:last-child { border-bottom:0; }
         .stream-head, .lineage-header { display:flex; justify-content:space-between; gap:12px; margin-bottom:4px; }
-        .stream-event { font-weight:700; }
+        .stream-event { font-weight:700; color:var(--navy); }
         .empty { padding:36px 20px; text-align:center; color:var(--muted); }
         .lineage-node { border-left:2px solid var(--line); margin:8px 0 0 10px; padding-left:12px; }
         .lineage-node.selected { border-left-color:var(--accent); }
         .task-id strong { display:block; font-size:14px; line-height:1.4; }
         .task-id .mono { display:block; margin-top:4px; color:var(--muted); }
         .table-actions { display:flex; gap:8px; align-items:center; }
-        @media (max-width:1480px) { .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .process-rail { grid-template-columns:repeat(3, minmax(0,1fr)); } }
-        @media (max-width:1280px) { .hero, .workspace { grid-template-columns:1fr; } .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .process-rail { grid-template-columns:repeat(2, minmax(0,1fr)); } .toolbar.primary, .toolbar.secondary, .toolbar.actions { grid-template-columns:repeat(2, minmax(0,1fr)); } .detail { position:static; } }
+        .detail-trigger {
+            display:inline-flex;
+            align-items:center;
+            justify-content:center;
+            min-height:34px;
+            padding:0 12px;
+            border-radius:999px;
+            border:1px solid var(--line);
+            background:#fff;
+            color:var(--accent-strong);
+            font:inherit;
+            font-size:12px;
+            font-weight:700;
+            cursor:pointer;
+        }
+        @media (max-width:1480px) { .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } }
+        @media (max-width:1280px) { .hero, .workspace, .status-grid { grid-template-columns:1fr; } .cards { grid-template-columns:repeat(2, minmax(0,1fr)); } .detail-dialog { width:min(100vw - 28px, 100%); } }
         @media (max-width:960px) { .topbar-card { flex-direction:column; align-items:flex-start; } .nav { width:100%; } .operator-chip { margin-left:0; padding-left:0; border-left:0; min-width:0; } .shell { width:min(100vw - 20px, 100%); } .toolbar-summary { flex-direction:column; align-items:flex-start; } }
-        @media (max-width:720px) { h1 { font-size:32px; } .process-rail, .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } }
+        @media (max-width:720px) { h1 { font-size:32px; } .cards, .toolbar.primary, .toolbar.secondary, .toolbar.actions, .detail-grid { grid-template-columns:1fr; } .process-footer { align-items:flex-start; } }
     </style>
 </head>
 <body>
@@ -357,8 +445,8 @@
     <section class="hero">
         <article class="panel headline">
             <div class="eyebrow">WorkerHub Operations</div>
-            <h1>Centro de operacion para colas y migracion documental.</h1>
-            <p class="lead">Consola ejecutiva para seguimiento de tareas, reintentos, dead letters y lineage. La vista principal prioriza estado, accion y contexto; el detalle tecnico queda contenido y no compite con la lectura operativa.</p>
+            <h1>Centro operativo de colas y migracion.</h1>
+            <p class="lead">Bandeja central para revisar estado, tarea programada, incidentes y detalle tecnico sin duplicar bloques visuales.</p>
             <div class="headline-meta">
                 <div class="headline-pill">
                     <span>Canal</span>
@@ -375,19 +463,6 @@
                     <strong>Monitor y Horizon unificados</strong>
                 </div>
             </div>
-            @if (false)
-            <h1>Monitor azul para operación de colas, DLQ y replay.</h1>
-            <p class="lead">Vista central para tareas en Kafka o `direct_queue`, encolamiento Redis/Horizon y migraciones documentales a Siesa. El panel prioriza claridad operativa, lectura rápida y trazabilidad completa por tarea.</p>
-            <p class="hint" style="margin-top:14px;">
-                Canal de acceso: <strong id="access-channel">{{ $accessChannel ?? 'web' }}</strong>
-                @if (is_array($operator ?? null))
-                    | Operador: <strong>{{ $operator['name'] ?? $operator['email'] ?? 'sesion activa' }}</strong>
-                @endif
-            </p>
-            <p class="hint" style="margin-top:12px;">Acceso unificado con backoffice: la misma sesión habilita este monitor y el dashboard de Horizon.</p>
-            @endif
-        </article>
-        <aside class="panel status-box">
             <div class="status-dot">Infraestructura operativa</div>
             <div class="status-grid">
                 <div class="status-pill">
@@ -406,7 +481,18 @@
                     <small>La sesion operativa y el acceso a Horizon comparten esta dependencia.</small>
                 </div>
             </div>
-        </aside>
+            @if (false)
+            <h1>Monitor azul para operación de colas, DLQ y replay.</h1>
+            <p class="lead">Vista central para tareas en Kafka o `direct_queue`, encolamiento Redis/Horizon y migraciones documentales a Siesa. El panel prioriza claridad operativa, lectura rápida y trazabilidad completa por tarea.</p>
+            <p class="hint" style="margin-top:14px;">
+                Canal de acceso: <strong id="access-channel">{{ $accessChannel ?? 'web' }}</strong>
+                @if (is_array($operator ?? null))
+                    | Operador: <strong>{{ $operator['name'] ?? $operator['email'] ?? 'sesion activa' }}</strong>
+                @endif
+            </p>
+            <p class="hint" style="margin-top:12px;">Acceso unificado con backoffice: la misma sesión habilita este monitor y el dashboard de Horizon.</p>
+            @endif
+        </article>
     </section>
 
     <section class="cards">
@@ -414,71 +500,92 @@
         <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Procesando</div><div class="metric-value" data-key="processing">0</div><div class="metric-subtle">Carga activa en ejecucion</div></article>
         <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Completadas</div><div class="metric-value" data-key="completed">0</div><div class="metric-subtle">Tareas cerradas sin error</div></article>
         <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Dead Letters</div><div class="metric-value" data-key="dead_letters">0</div><div class="metric-subtle">Incidentes que requieren accion</div></article>
-        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Replays</div><div class="metric-value" data-key="replayed">0</div><div class="metric-subtle">Reintentos operativos ejecutados</div></article>
-        <article class="panel metric"><div class="metric-keyline"></div><div class="metric-label">Publicadas</div><div class="metric-value" data-key="published">0</div><div class="metric-subtle">Mensajes entregados al broker</div></article>
-    </section>
-    <section class="process-rail" id="process-rail">
-        <button class="process-card active" type="button" data-process-key="">
-            <small>Bandeja</small>
-            <strong>Todos los procesos</strong>
-            <span>Vista global de las tareas recibidas desde Windows, API y replays.</span>
-            <div class="process-meta"><span id="process-all-total">0 tareas</span><span id="process-all-failed">0 incidentes</span></div>
-        </button>
-        @foreach (($processDefinitions ?? []) as $definition)
-            <button class="process-card" type="button" data-process-key="{{ $definition['key'] }}">
-                <small>Proceso</small>
-                <strong>{{ $definition['label'] }}</strong>
-                <span>{{ $definition['description'] ?? 'Sin descripcion operativa.' }}</span>
-                <div class="process-meta">
-                    <span data-process-total="{{ $definition['key'] }}">0 tareas</span>
-                    <span data-process-failed="{{ $definition['key'] }}">0 incidentes</span>
-                </div>
-            </button>
-        @endforeach
     </section>
     <section class="workspace">
         <article class="panel">
             <div class="toolbar primary">
-                <input id="filter-source" type="text" placeholder="Origen: crm, erp, api">
-                <input id="filter-schedule-name" type="text" placeholder="Tarea programada: ImportarRecibos">
-                <select id="filter-status">
-                    <option value="">Todos los estados</option>
-                    <option value="received">received</option>
-                    <option value="published">published</option>
-                    <option value="queued">queued</option>
-                    <option value="processing">processing</option>
-                    <option value="completed">completed</option>
-                    <option value="failed">failed</option>
-                    <option value="rejected">rejected</option>
-                </select>
-                <select id="filter-type">
-                    <option value="">Todos los tipos</option>
-                    <option value="document_migration">document_migration</option>
-                </select>
-                <select id="filter-mode">
-                    <option value="all">Vista general</option>
-                    <option value="dead_letters">Solo DLQ</option>
-                </select>
-                <select id="filter-priority">
-                    <option value="">Todas las prioridades</option>
-                    <option value="default">default</option>
-                    <option value="high">high</option>
-                </select>
+                <div class="field">
+                    <label for="filter-source">Origen</label>
+                    <input id="filter-source" type="text" placeholder="crm, erp, api">
+                </div>
+                <div class="field">
+                    <label for="filter-schedule-name">Tarea programada</label>
+                    <input id="filter-schedule-name" type="text" placeholder="ImportarRecibos">
+                </div>
+                <div class="field">
+                    <label for="filter-process-key">Proceso</label>
+                    <select id="filter-process-key">
+                        <option value="">Todos los procesos</option>
+                        @foreach (($processDefinitions ?? []) as $definition)
+                            <option value="{{ $definition['key'] }}">{{ $definition['label'] }}</option>
+                        @endforeach
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="filter-status">Estado</label>
+                    <select id="filter-status">
+                        <option value="">Todos los estados</option>
+                        <option value="received">received</option>
+                        <option value="published">published</option>
+                        <option value="queued">queued</option>
+                        <option value="processing">processing</option>
+                        <option value="completed">completed</option>
+                        <option value="failed">failed</option>
+                        <option value="rejected">rejected</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="filter-type">Tipo</label>
+                    <select id="filter-type">
+                        <option value="">Todos los tipos</option>
+                        <option value="document_migration">document_migration</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="filter-mode">Vista</label>
+                    <select id="filter-mode">
+                        <option value="all">Vista general</option>
+                        <option value="dead_letters">Solo DLQ</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="filter-priority">Prioridad</label>
+                    <select id="filter-priority">
+                        <option value="">Todas las prioridades</option>
+                        <option value="default">default</option>
+                        <option value="high">high</option>
+                    </select>
+                </div>
             </div>
             <div class="toolbar secondary">
-                <input id="filter-queue" type="text" placeholder="Queue: migration-high">
-                <input id="filter-date-from" type="date">
-                <input id="filter-date-to" type="date">
-                <select id="filter-replay-mode">
-                    <option value="all">Originales y replays</option>
-                    <option value="originals">Solo originales</option>
-                    <option value="replays">Solo replays</option>
-                </select>
-                <select id="filter-error-mode">
-                    <option value="all">Con y sin error</option>
-                    <option value="with_error">Solo con error</option>
-                    <option value="without_error">Solo sin error</option>
-                </select>
+                <div class="field">
+                    <label for="filter-queue">Queue</label>
+                    <input id="filter-queue" type="text" placeholder="migration-high">
+                </div>
+                <div class="field">
+                    <label for="filter-date-from">Desde</label>
+                    <input id="filter-date-from" type="date">
+                </div>
+                <div class="field">
+                    <label for="filter-date-to">Hasta</label>
+                    <input id="filter-date-to" type="date">
+                </div>
+                <div class="field">
+                    <label for="filter-replay-mode">Replay</label>
+                    <select id="filter-replay-mode">
+                        <option value="all">Originales y replays</option>
+                        <option value="originals">Solo originales</option>
+                        <option value="replays">Solo replays</option>
+                    </select>
+                </div>
+                <div class="field">
+                    <label for="filter-error-mode">Error</label>
+                    <select id="filter-error-mode">
+                        <option value="all">Con y sin error</option>
+                        <option value="with_error">Solo con error</option>
+                        <option value="without_error">Solo sin error</option>
+                    </select>
+                </div>
             </div>
             <div class="toolbar actions">
                 <button id="refresh-button" type="button">Actualizar</button>
@@ -492,7 +599,7 @@
             <div class="toolbar-summary">
                 <div>
                     <strong>Bandeja operativa</strong>
-                    <span>Selecciona una tarea para abrir el contexto operativo, el lineage y las acciones disponibles.</span>
+                    <span>Filtra por proceso, tarea programada o estado. El detalle tecnico queda concentrado a la derecha.</span>
                 </div>
                 <div class="hint" id="filter-summary">Sin filtros activos.</div>
             </div>
@@ -502,6 +609,7 @@
                     <tr>
                         <th>Tarea</th>
                         <th></th>
+                        <th>Detalle</th>
                         <th>Estado</th>
                         <th>Proceso</th>
                         <th>Programada</th>
@@ -513,56 +621,79 @@
                     </tr>
                     </thead>
                     <tbody id="tasks-body">
-                    <tr><td class="empty" colspan="10">Cargando tareas...</td></tr>
+                    <tr><td class="empty" colspan="11">Cargando tareas...</td></tr>
                     </tbody>
                 </table>
             </div>
+            <div class="process-footer">
+                <div class="process-footer-copy">
+                    <strong>Resumen por proceso</strong>
+                    <span>Usa el selector de proceso en los filtros para escalar esta vista cuando la operacion crezca.</span>
+                </div>
+                <div class="process-pills">
+                    <span class="process-pill" id="process-summary-name">Todos los procesos</span>
+                    <span class="process-pill" id="process-summary-total">0 tareas</span>
+                    <span class="process-pill" id="process-summary-failed">0 incidentes</span>
+                </div>
+            </div>
         </article>
 
-        <aside class="panel detail">
-            <div class="eyebrow">Detalle</div>
-            <h2 id="detail-title">Selecciona una tarea</h2>
-            <p class="hint" id="detail-subtitle">Aqui veras eventos, payload resumido y opciones operativas.</p>
-            <div class="detail-tabs">
-                <button class="detail-tab active" type="button" data-detail-tab="summary">Resumen</button>
-                <button class="detail-tab" type="button" data-detail-tab="lineage">Lineage</button>
-                <button class="detail-tab" type="button" data-detail-tab="events">Eventos</button>
-                <button class="detail-tab" type="button" data-detail-tab="actions">Acciones</button>
-            </div>
-            <div class="detail-pane active" data-detail-pane="summary">
-                <div class="detail-grid" id="detail-grid"></div>
-                <div class="actions" style="display:flex; gap:10px; margin-bottom:12px;">
-                    <button id="retry-button" type="button" disabled>Reencolar tarea</button>
-                    <button id="open-api-button" class="secondary" type="button" disabled>Abrir JSON</button>
-                </div>
-                <div class="hint" id="detail-error"></div>
-            </div>
-            <div class="detail-pane" data-detail-pane="lineage">
-                <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
-                    <div class="eyebrow">Lineage</div>
-                    <div id="detail-lineage" class="hint">Sin datos.</div>
-                </div>
-            </div>
-            <div class="detail-pane" data-detail-pane="events">
-                <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
-                    <div class="eyebrow">Eventos</div>
-                    <div id="detail-events" class="hint">Sin datos.</div>
-                </div>
-            </div>
-            <div class="detail-pane" data-detail-pane="actions">
-                <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
-                    <div class="eyebrow">Acciones operativas</div>
-                    <div id="detail-actions" class="hint">Sin datos.</div>
-                </div>
-            </div>
-        </aside>
     </section>
+
+    <div class="detail-modal" id="detail-modal" aria-hidden="true">
+        <div class="detail-backdrop" id="detail-backdrop"></div>
+        <div class="detail-dialog" role="dialog" aria-modal="true" aria-labelledby="detail-title">
+            <div class="detail-header">
+                <div>
+                    <div class="eyebrow">Detalle</div>
+                    <h2 id="detail-title">Selecciona una tarea</h2>
+                    <p class="hint" id="detail-subtitle">Aqui veras contexto, lineage, eventos y acciones sin saturar la bandeja principal.</p>
+                </div>
+                <button id="detail-close" class="detail-close" type="button" aria-label="Cerrar detalle">×</button>
+            </div>
+            <div class="detail">
+                <div class="detail-tabs">
+                    <button class="detail-tab active" type="button" data-detail-tab="summary">Resumen</button>
+                    <button class="detail-tab" type="button" data-detail-tab="lineage">Lineage</button>
+                    <button class="detail-tab" type="button" data-detail-tab="events">Eventos</button>
+                    <button class="detail-tab" type="button" data-detail-tab="actions">Acciones</button>
+                </div>
+                <div class="detail-pane active" data-detail-pane="summary">
+                    <div class="detail-grid" id="detail-grid"></div>
+                    <div class="actions" style="display:flex; gap:10px; margin-bottom:12px;">
+                        <button id="retry-button" type="button" disabled>Reencolar tarea</button>
+                        <button id="open-api-button" class="secondary" type="button" disabled>Abrir JSON</button>
+                    </div>
+                    <div class="hint" id="detail-error"></div>
+                </div>
+                <div class="detail-pane" data-detail-pane="lineage">
+                    <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
+                        <div class="eyebrow">Lineage</div>
+                        <div id="detail-lineage" class="hint">Sin datos.</div>
+                    </div>
+                </div>
+                <div class="detail-pane" data-detail-pane="events">
+                    <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
+                        <div class="eyebrow">Eventos</div>
+                        <div id="detail-events" class="hint">Sin datos.</div>
+                    </div>
+                </div>
+                <div class="detail-pane" data-detail-pane="actions">
+                    <div class="stream" style="margin-top:0; border-top:0; padding-top:0;">
+                        <div class="eyebrow">Acciones operativas</div>
+                        <div id="detail-actions" class="hint">Sin datos.</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
 <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/laravel-echo@1.16.1/dist/echo.iife.js"></script>
 <script>
 window.workerhubOperatorToken = @json($operatorToken ?? '');
 window.workerhubProcessDefinitions = @json($processDefinitions ?? []);
+const processDefinitionMap = new Map((window.workerhubProcessDefinitions || []).map(item => [item.key, item]));
 
 const FILTER_STORAGE_KEY = 'workerhub.monitor.filters';
 const TASK_STORAGE_KEY = 'workerhub.monitor.selected_task_id';
@@ -590,13 +721,19 @@ const nodes = {
     dispatchMode: document.getElementById('dispatch-mode'),
     backofficeState: document.getElementById('backoffice-state'),
     filterSummary: document.getElementById('filter-summary'),
-    processRail: document.getElementById('process-rail'),
+    processSummaryName: document.getElementById('process-summary-name'),
+    processSummaryTotal: document.getElementById('process-summary-total'),
+    processSummaryFailed: document.getElementById('process-summary-failed'),
+    detailModal: document.getElementById('detail-modal'),
+    detailBackdrop: document.getElementById('detail-backdrop'),
+    detailClose: document.getElementById('detail-close'),
     detailTabs: Array.from(document.querySelectorAll('[data-detail-tab]')),
     detailPanes: Array.from(document.querySelectorAll('[data-detail-pane]')),
 };
 const filterInputs = {
     source: document.getElementById('filter-source'),
     schedule_name: document.getElementById('filter-schedule-name'),
+    process_key: document.getElementById('filter-process-key'),
     status: document.getElementById('filter-status'),
     type: document.getElementById('filter-type'),
     mode: document.getElementById('filter-mode'),
@@ -631,19 +768,15 @@ Object.entries(filterInputs).forEach(([key, input]) => {
     });
 });
 
-nodes.processRail.querySelectorAll('[data-process-key]').forEach(button => {
-    button.addEventListener('click', () => {
-        state.filters.process_key = button.dataset.processKey || '';
-        saveFilters();
-        hydrateFilters();
-        renderProcessRail(state.summary);
-        renderFilterSummary();
-        refreshAll(true);
-    });
-});
-
 nodes.detailTabs.forEach(button => {
     button.addEventListener('click', () => activateDetailTab(button.dataset.detailTab));
+});
+nodes.detailClose.addEventListener('click', closeDetailModal);
+nodes.detailBackdrop.addEventListener('click', closeDetailModal);
+document.addEventListener('keydown', event => {
+    if (event.key === 'Escape') {
+        closeDetailModal();
+    }
 });
 
 nodes.exportTasksButton.addEventListener('click', () => window.open(`/api/monitor/tasks/export?${buildTaskParams()}`, '_blank'));
@@ -830,7 +963,10 @@ function escapeHtml(value) {
 function renderFilterSummary() {
     const labels = [];
     if (state.filters.mode === 'dead_letters') labels.push('modo=DLQ');
-    if (state.filters.process_key) labels.push(`proceso=${state.filters.process_key}`);
+    if (state.filters.process_key) {
+        const processLabel = processDefinitionMap.get(state.filters.process_key)?.label || state.filters.process_key;
+        labels.push(`proceso=${processLabel}`);
+    }
     if (state.filters.schedule_name) labels.push(`programada=${state.filters.schedule_name}`);
     if (state.filters.status) labels.push(`estado=${state.filters.status}`);
     if (state.filters.type) labels.push(`tipo=${state.filters.type}`);
@@ -850,38 +986,21 @@ function renderProcessRail(summary) {
     const byKey = new Map(processSummary.map(item => [item.key, item]));
     const total = summary?.total ?? 0;
     const failed = summary?.dead_letters ?? 0;
+    const key = state.filters.process_key || '';
+    const definition = key ? processDefinitionMap.get(key) : null;
+    const selected = key ? (byKey.get(key) || { key, label: definition?.label || key, total: 0, failed: 0 }) : null;
 
-    const allTotal = document.getElementById('process-all-total');
-    const allFailed = document.getElementById('process-all-failed');
-
-    if (allTotal) {
-        allTotal.textContent = `${total} tareas`;
+    if (nodes.processSummaryName) {
+        nodes.processSummaryName.textContent = selected?.label || 'Todos los procesos';
     }
 
-    if (allFailed) {
-        allFailed.textContent = `${failed} incidentes`;
+    if (nodes.processSummaryTotal) {
+        nodes.processSummaryTotal.textContent = `${selected?.total ?? total} tareas`;
     }
 
-    nodes.processRail.querySelectorAll('[data-process-key]').forEach(button => {
-        const key = button.dataset.processKey || '';
-        button.classList.toggle('active', key === (state.filters.process_key || ''));
-
-        if (key === '') {
-            return;
-        }
-
-        const payload = byKey.get(key) || { total: 0, failed: 0 };
-        const totalNode = button.querySelector(`[data-process-total="${key}"]`);
-        const failedNode = button.querySelector(`[data-process-failed="${key}"]`);
-
-        if (totalNode) {
-            totalNode.textContent = `${payload.total || 0} tareas`;
-        }
-
-        if (failedNode) {
-            failedNode.textContent = `${payload.failed || 0} incidentes`;
-        }
-    });
+    if (nodes.processSummaryFailed) {
+        nodes.processSummaryFailed.textContent = `${selected?.failed ?? failed} incidentes`;
+    }
 }
 
 function activateDetailTab(tab) {
@@ -892,6 +1011,16 @@ function activateDetailTab(tab) {
     nodes.detailPanes.forEach(pane => {
         pane.classList.toggle('active', pane.dataset.detailPane === tab);
     });
+}
+
+function openDetailModal() {
+    nodes.detailModal.classList.add('is-open');
+    nodes.detailModal.setAttribute('aria-hidden', 'false');
+}
+
+function closeDetailModal() {
+    nodes.detailModal.classList.remove('is-open');
+    nodes.detailModal.setAttribute('aria-hidden', 'true');
 }
 
 async function fetchJson(url) {
@@ -968,7 +1097,7 @@ async function refreshActions() {
 
 function renderTasks() {
     if (state.tasks.length === 0) {
-        nodes.body.innerHTML = '<tr><td class="empty" colspan="10">No hay tareas para los filtros actuales.</td></tr>';
+        nodes.body.innerHTML = '<tr><td class="empty" colspan="11">No hay tareas para los filtros actuales.</td></tr>';
         return;
     }
 
@@ -976,6 +1105,7 @@ function renderTasks() {
         <tr data-task-id="${escapeHtml(task.id)}" class="${task.id === state.selectedTaskId ? 'is-selected' : ''}">
             <td class="task-id"><strong>${escapeHtml(task.id)}</strong><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
             <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!['failed', 'rejected'].includes(task.status) ? 'disabled' : ''}></td>
+            <td><button class="detail-trigger" type="button" data-detail-task-id="${escapeHtml(task.id)}">Ver detalle</button></td>
             <td><span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span></td>
             <td><span class="${badgeClass('default')}">${escapeHtml(task.process_label || 'General')}</span></td>
             <td>${escapeHtml(task.schedule_name || task.task_name || '-')}</td>
@@ -987,10 +1117,6 @@ function renderTasks() {
         </tr>
     `).join('');
 
-    nodes.body.querySelectorAll('tr[data-task-id]').forEach(row => {
-        row.addEventListener('click', async () => showTask(row.dataset.taskId));
-    });
-
     nodes.body.querySelectorAll('.task-selector').forEach(input => {
         input.addEventListener('click', event => event.stopPropagation());
         input.addEventListener('change', event => {
@@ -999,6 +1125,13 @@ function renderTasks() {
             } else {
                 state.selectedIds.delete(event.target.value);
             }
+        });
+    });
+
+    nodes.body.querySelectorAll('[data-detail-task-id]').forEach(button => {
+        button.addEventListener('click', async event => {
+            event.stopPropagation();
+            await showTask(button.dataset.detailTaskId);
         });
     });
 }
@@ -1015,6 +1148,7 @@ async function showTask(taskId) {
 
     state.lineage = lineage;
     renderTaskDetail(task);
+    openDetailModal();
 }
 
 function renderTaskDetail(task) {
@@ -1022,6 +1156,7 @@ function renderTaskDetail(task) {
         state.selectedTaskId = null;
         state.lineage = null;
         saveSelectedTaskId(null);
+        closeDetailModal();
         nodes.detailTitle.textContent = 'Selecciona una tarea';
         nodes.detailSubtitle.textContent = 'Aqui veras eventos, payload resumido y opciones operativas.';
         nodes.detailGrid.innerHTML = '';
