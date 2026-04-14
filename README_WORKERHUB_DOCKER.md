@@ -29,7 +29,7 @@
 - API Laravel: `http://localhost:5010`
 - Horizon: `http://localhost:5010/horizon`
 - Redpanda Console: `http://localhost:8081`
-- Echo Server / Socket.IO: `http://localhost:6001`
+- Echo Server / Socket.IO: `http://localhost:6002`
 - Kafka externo: `localhost:19092`
 - Redis externo: `localhost:6381`
 - SQL Server: externo al compose, configurado por `DB_HOST`/`DB_PORT`
@@ -166,7 +166,7 @@ La misma sesion autenticada se reutiliza en:
 
 - Broadcaster: `pusher`
 - Host interno Docker: `echo-server:6001`
-- Host cliente local: `localhost:6001`
+- Host cliente local: `localhost:6002`
 - Canal general: `workerhub.monitor`
 - Canal por tarea: `workerhub.tasks.{task_id}`
 
@@ -205,7 +205,8 @@ La base de ese siguiente paso ya queda en:
 - `KAFKA_TOPIC_DEAD_LETTERS=workerhub.tasks.dead_letters`
 - `BROADCAST_DRIVER=pusher`
 - `PUSHER_HOST=echo-server`
-- `PUSHER_PORT=6001`
+- `PUSHER_PORT=6001` interno entre contenedores
+- `ECHO_SERVER_PORT_FORWARD=6002` para exponer sockets al navegador/host
 - `WORKERHUB_OPERATIONS_TOKEN`
 - `WORKERHUB_ALLOW_TOKEN_FALLBACK`
 - `WORKERHUB_ALLOW_LOCAL_BYPASS`
