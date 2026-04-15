@@ -4,14 +4,14 @@ namespace App\Services\Workers\Receipts;
 
 use App\Contracts\ReceiptCustomerSyncDataSourceInterface;
 use App\Exceptions\WorkerTaskProcessingException;
-use Epsalibrary\Contracts\ImportManagerInterface;
+use App\Services\Workers\SiesaImportAuditService;
 use Illuminate\Contracts\Config\Repository;
 use stdClass;
 
 class ReceiptCustomerSyncService
 {
     public function __construct(
-        private readonly ImportManagerInterface $importManager,
+        private readonly SiesaImportAuditService $auditService,
         private readonly ReceiptCustomerSyncDataSourceInterface $dataSource,
         private readonly ReceiptCustomerSyncLineFactory $lineFactory,
         private readonly Repository $config
@@ -66,7 +66,18 @@ class ReceiptCustomerSyncService
             }
 
             $lines = $this->lineFactory->build($snapshot);
-            $result = $this->importManager->import($lines);
+            $audit = $this->auditService->import($lines, [
+                'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
+                'task_type' => $payload['_workerhub_task_type'] ?? 'receipt_migration',
+                'document_id' => $payload['document_id'] ?? null,
+                'source' => $payload['source'] ?? null,
+                'import_stage' => 'receipt_customer_sync',
+                'customer_sync_role' => $role,
+                'third_party_id' => $snapshot->thirdPartyId,
+                'source_branch' => $snapshot->sourceBranch,
+                'line_count' => count($lines),
+            ]);
+            $result = $audit->result;
 
             if (!$result->success) {
                 throw new WorkerTaskProcessingException(
@@ -76,6 +87,7 @@ class ReceiptCustomerSyncService
                         'payload' => $payload,
                         'customer_sync_role' => $role,
                         'customer_sync' => $snapshot->toArray(),
+                        'siesa_web_service' => $audit->log->toArray(),
                         'xml_payload' => $result->payload,
                     ]
                 );
@@ -91,6 +103,7 @@ class ReceiptCustomerSyncService
                 'message' => $result->message,
                 'errors' => $result->errors,
                 'snapshot' => $snapshot->toArray(),
+                'siesa_web_service' => $audit->log->toArray(),
                 'import_payload' => $result->payload,
             ];
         }

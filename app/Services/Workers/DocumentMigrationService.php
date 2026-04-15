@@ -3,13 +3,12 @@
 namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
-use Epsalibrary\Contracts\ImportManagerInterface;
 
 class DocumentMigrationService
 {
     public function __construct(
-        private readonly ImportManagerInterface $importManager,
-        private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator
+        private readonly SiesaImportAuditService $auditService,
+        private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
     )
     {
     }
@@ -35,7 +34,15 @@ class DocumentMigrationService
 
         $this->soapConfigurationValidator->validate();
 
-        $result = $this->importManager->import($normalizedLines);
+        $audit = $this->auditService->import($normalizedLines, [
+            'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
+            'task_type' => $payload['_workerhub_task_type'] ?? 'document_migration',
+            'document_id' => $payload['document_id'] ?? null,
+            'source' => $payload['source'] ?? null,
+            'import_stage' => 'document_migration',
+            'line_count' => count($normalizedLines),
+        ]);
+        $result = $audit->result;
 
         if (!$result->success) {
             throw new WorkerTaskProcessingException(
@@ -43,6 +50,7 @@ class DocumentMigrationService
                 [
                     'errors' => $result->errors,
                     'payload' => $payload,
+                    'siesa_web_service' => $audit->log->toArray(),
                     'xml_payload' => $result->payload,
                 ]
             );
@@ -53,6 +61,7 @@ class DocumentMigrationService
             'source' => $payload['source'] ?? null,
             'message' => $result->message,
             'errors' => $result->errors,
+            'siesa_web_service' => $audit->log->toArray(),
             'import_payload' => $result->payload,
             'line_count' => count($normalizedLines),
         ];

@@ -2,9 +2,11 @@
 
 namespace Tests\Unit;
 
+use App\Data\SiesaWebServiceLogRecord;
 use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\DocumentMigrationService;
-use Epsalibrary\Contracts\ImportManagerInterface;
+use App\Services\Workers\SiesaImportAuditResult;
+use App\Services\Workers\SiesaImportAuditService;
 use Epsalibrary\Results\ImportResult;
 use Mockery;
 use Tests\TestCase;
@@ -18,11 +20,11 @@ class DocumentMigrationServiceTest extends TestCase
         config()->set('epsa_library.soap.password', '');
         config()->set('epsa_library.soap.connection', '');
 
-        $importManager = Mockery::mock(ImportManagerInterface::class);
-        $importManager->shouldNotReceive('import');
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldNotReceive('import');
 
         $service = $this->app->make(DocumentMigrationService::class, [
-            'importManager' => $importManager,
+            'auditService' => $auditService,
         ]);
 
         $this->expectException(WorkerTaskProcessingException::class);
@@ -41,11 +43,11 @@ class DocumentMigrationServiceTest extends TestCase
         config()->set('epsa_library.soap.password', 'secret');
         config()->set('epsa_library.soap.connection', 'UNOEE');
 
-        $importManager = Mockery::mock(ImportManagerInterface::class);
-        $importManager->shouldNotReceive('import');
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldNotReceive('import');
 
         $service = $this->app->make(DocumentMigrationService::class, [
-            'importManager' => $importManager,
+            'auditService' => $auditService,
         ]);
 
         $this->expectException(WorkerTaskProcessingException::class);
@@ -64,14 +66,32 @@ class DocumentMigrationServiceTest extends TestCase
         config()->set('epsa_library.soap.password', 'secret');
         config()->set('epsa_library.soap.connection', 'UNOEE');
 
-        $importManager = Mockery::mock(ImportManagerInterface::class);
-        $importManager->shouldReceive('import')
+        $log = new SiesaWebServiceLogRecord(
+            9,
+            '<Linea>00000010</Linea>',
+            ['import_stage' => 'document_migration']
+        );
+
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldReceive('import')
             ->once()
-            ->with(['<Linea>00000010</Linea>'])
-            ->andReturn(new ImportResult(true, 'Importacion exitosa', [], '<Envelope />'));
+            ->with(
+                ['<Linea>00000010</Linea>'],
+                Mockery::on(static function (array $context): bool {
+                    return $context['task_type'] === 'document_migration'
+                        && $context['document_id'] === 'DOC-E2E-002'
+                        && $context['source'] === 'monitor'
+                        && $context['import_stage'] === 'document_migration'
+                        && $context['line_count'] === 1;
+                })
+            )
+            ->andReturn(new SiesaImportAuditResult(
+                $log,
+                new ImportResult(true, 'Importacion exitosa', [], '<Envelope />')
+            ));
 
         $service = $this->app->make(DocumentMigrationService::class, [
-            'importManager' => $importManager,
+            'auditService' => $auditService,
         ]);
 
         $result = $service->handle([
@@ -83,5 +103,6 @@ class DocumentMigrationServiceTest extends TestCase
         $this->assertSame('DOC-E2E-002', $result['document_id']);
         $this->assertSame('Importacion exitosa', $result['message']);
         $this->assertSame(1, $result['line_count']);
+        $this->assertSame(9, $result['siesa_web_service']['id']);
     }
 }

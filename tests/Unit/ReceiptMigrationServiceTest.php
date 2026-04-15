@@ -7,12 +7,14 @@ use App\Exceptions\WorkerTaskProcessingException;
 use App\Data\Receipts\ReceiptCrossReferenceSnapshot;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
+use App\Data\SiesaWebServiceLogRecord;
+use App\Services\Workers\SiesaImportAuditResult;
+use App\Services\Workers\SiesaImportAuditService;
 use App\Services\Workers\Receipts\ReceiptCrossReferenceGuard;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
-use Epsalibrary\Contracts\ImportManagerInterface;
 use Epsalibrary\Results\ImportResult;
 use Mockery;
 use stdClass;
@@ -120,19 +122,31 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $lineFactory = new ReceiptLineFactory();
 
-        $importManager = Mockery::mock(ImportManagerInterface::class);
-        $importManager->shouldReceive('import')
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldReceive('import')
             ->once()
-            ->with(Mockery::on(static function (array $lines): bool {
-                return count($lines) === 3
-                    && str_starts_with($lines[0], '035700')
-                    && str_starts_with($lines[1], '035701')
-                    && str_starts_with($lines[2], '035702');
-            }))
-            ->andReturn(new ImportResult(true, 'Recibo importado', [], '<Envelope />'));
+            ->with(
+                Mockery::on(static function (array $lines): bool {
+                    return count($lines) === 3
+                        && str_starts_with($lines[0], '035700')
+                        && str_starts_with($lines[1], '035701')
+                        && str_starts_with($lines[2], '035702');
+                }),
+                Mockery::on(static function (array $context): bool {
+                    return $context['task_type'] === 'receipt_migration'
+                        && $context['document_id'] === '001-RX-1001'
+                        && $context['import_stage'] === 'receipt_migration'
+                        && $context['line_count'] === 3
+                        && $context['payment_count'] === 1;
+                })
+            )
+            ->andReturn(new SiesaImportAuditResult(
+                new SiesaWebServiceLogRecord(101, '<Envelope />', ['import_stage' => 'receipt_migration']),
+                new ImportResult(true, 'Recibo importado', [], '<Envelope />')
+            ));
 
         $service = new ReceiptMigrationService(
-            $importManager,
+            $auditService,
             $validator,
             $guard,
             $repository,
@@ -157,6 +171,7 @@ class ReceiptMigrationServiceTest extends TestCase
         $this->assertSame(100000.0, $result['pre_migration']['legalized_amount']);
         $this->assertTrue($result['cross_reference']['exists']);
         $this->assertSame('synced', $result['customer_sync']['status']);
+        $this->assertSame(101, $result['siesa_web_service']['id']);
     }
 
     public function test_it_surfaces_receipt_import_failures_with_context(): void
@@ -206,13 +221,16 @@ class ReceiptMigrationServiceTest extends TestCase
         $lineFactory = Mockery::mock(ReceiptLineFactory::class);
         $lineFactory->shouldReceive('build')->once()->andReturn(['035700...', '035701...', '035702...']);
 
-        $importManager = Mockery::mock(ImportManagerInterface::class);
-        $importManager->shouldReceive('import')
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldReceive('import')
             ->once()
-            ->andReturn(new ImportResult(false, 'Fallo importando recibo', ['soap_error'], '<Envelope />'));
+            ->andReturn(new SiesaImportAuditResult(
+                new SiesaWebServiceLogRecord(202, '<Envelope />', ['import_stage' => 'receipt_migration']),
+                new ImportResult(false, 'Fallo importando recibo', ['soap_error'], '<Envelope />')
+            ));
 
         $service = new ReceiptMigrationService(
-            $importManager,
+            $auditService,
             $validator,
             $guard,
             $repository,

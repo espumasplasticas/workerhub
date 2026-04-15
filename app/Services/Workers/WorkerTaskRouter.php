@@ -48,6 +48,9 @@ class WorkerTaskRouter
             throw new WorkerTaskProcessingException('El payload de la tarea debe ser un objeto JSON.', ['task' => $task]);
         }
 
+        $payload['_workerhub_task_id'] = $task['task_id'] ?? null;
+        $payload['_workerhub_task_type'] = $type;
+
         return match ($type) {
             'document_migration' => $this->documentMigrationService->handle($payload),
             'receipt_migration' => $this->receiptMigrationService->handle($payload),

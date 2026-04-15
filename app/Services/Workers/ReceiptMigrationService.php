@@ -8,12 +8,10 @@ use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
-use Epsalibrary\Contracts\ImportManagerInterface;
-
 class ReceiptMigrationService
 {
     public function __construct(
-        private readonly ImportManagerInterface $importManager,
+        private readonly SiesaImportAuditService $auditService,
         private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
         private readonly ReceiptPreMigrationGuard $preMigrationGuard,
         private readonly ReceiptPrototypeRepository $repository,
@@ -34,7 +32,16 @@ class ReceiptMigrationService
         $customerSync = $this->customerSyncService->sync($payload, $header);
         $payments = $this->repository->findPayments($payload);
         $lines = $this->lineFactory->build($header, $payments);
-        $result = $this->importManager->import($lines);
+        $audit = $this->auditService->import($lines, [
+            'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
+            'task_type' => $payload['_workerhub_task_type'] ?? 'receipt_migration',
+            'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+            'source' => $payload['source'] ?? null,
+            'import_stage' => 'receipt_migration',
+            'line_count' => count($lines),
+            'payment_count' => count($payments),
+        ]);
+        $result = $audit->result;
 
         if (!$result->success) {
             throw new WorkerTaskProcessingException(
@@ -42,6 +49,7 @@ class ReceiptMigrationService
                 [
                     'errors' => $result->errors,
                     'payload' => $payload,
+                    'siesa_web_service' => $audit->log->toArray(),
                     'xml_payload' => $result->payload,
                 ]
             );
@@ -52,6 +60,7 @@ class ReceiptMigrationService
             'source' => $payload['source'] ?? null,
             'message' => $result->message,
             'errors' => $result->errors,
+            'siesa_web_service' => $audit->log->toArray(),
             'import_payload' => $result->payload,
             'line_count' => count($lines),
             'payment_count' => count($payments),
