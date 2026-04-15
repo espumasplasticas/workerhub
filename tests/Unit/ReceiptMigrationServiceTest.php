@@ -2,10 +2,13 @@
 
 namespace Tests\Unit;
 
+use App\Data\Receipts\ReceiptPreMigrationSnapshot;
 use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
+use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
+use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
 use Epsalibrary\Contracts\ImportManagerInterface;
 use Epsalibrary\Results\ImportResult;
@@ -78,6 +81,28 @@ class ReceiptMigrationServiceTest extends TestCase
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
 
+        $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->andReturn(new ReceiptPreMigrationSnapshot(
+                operationalCenter: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                totalAmount: 100000,
+                legalizedAmount: 100000,
+                isCancelled: false,
+                isCancellationRequested: false,
+                isWompiExpiredWithoutPayment: false,
+            ));
+
+        $customerSync = Mockery::mock(ReceiptCustomerSyncService::class);
+        $customerSync->shouldReceive('sync')
+            ->once()
+            ->andReturn([
+                'status' => 'synced',
+                'line_count' => 12,
+            ]);
+
         $lineFactory = new ReceiptLineFactory();
 
         $importManager = Mockery::mock(ImportManagerInterface::class);
@@ -94,7 +119,9 @@ class ReceiptMigrationServiceTest extends TestCase
         $service = new ReceiptMigrationService(
             $importManager,
             $validator,
+            $guard,
             $repository,
+            $customerSync,
             $lineFactory
         );
 
@@ -111,6 +138,8 @@ class ReceiptMigrationServiceTest extends TestCase
         $this->assertSame('Recibo importado', $result['message']);
         $this->assertSame(3, $result['line_count']);
         $this->assertSame(1, $result['payment_count']);
+        $this->assertSame(100000.0, $result['pre_migration']['legalized_amount']);
+        $this->assertSame('synced', $result['customer_sync']['status']);
     }
 
     public function test_it_surfaces_receipt_import_failures_with_context(): void
@@ -121,6 +150,28 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
+
+        $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->andReturn(new ReceiptPreMigrationSnapshot(
+                operationalCenter: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                totalAmount: 100000,
+                legalizedAmount: 100000,
+                isCancelled: false,
+                isCancellationRequested: false,
+                isWompiExpiredWithoutPayment: false,
+            ));
+
+        $customerSync = Mockery::mock(ReceiptCustomerSyncService::class);
+        $customerSync->shouldReceive('sync')
+            ->once()
+            ->andReturn([
+                'status' => 'skipped',
+                'line_count' => 0,
+            ]);
 
         $lineFactory = Mockery::mock(ReceiptLineFactory::class);
         $lineFactory->shouldReceive('build')->once()->andReturn(['035700...', '035701...', '035702...']);
@@ -133,7 +184,9 @@ class ReceiptMigrationServiceTest extends TestCase
         $service = new ReceiptMigrationService(
             $importManager,
             $validator,
+            $guard,
             $repository,
+            $customerSync,
             $lineFactory
         );
 

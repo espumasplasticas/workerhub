@@ -110,6 +110,37 @@ return [
             'header' => env('WORKERHUB_RECEIPT_HEADER_VIEW', 'prototipos.v_prototipos_recibos_encabezado_sala_ventas'),
             'payments' => env('WORKERHUB_RECEIPT_PAYMENTS_VIEW', 'prototipos.v_prototipos_recibos_caja'),
         ],
+        'pre_migration' => [
+            'enabled' => filter_var(env('WORKERHUB_RECEIPT_PRE_MIGRATION_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'table' => env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado'),
+            'functions' => [
+                'legalized_amount' => env('WORKERHUB_RECEIPT_LEGALIZED_AMOUNT_FUNCTION', 'pos.fun_recibos_wompi_valor_legalizado'),
+                'expired_without_payment' => env('WORKERHUB_RECEIPT_EXPIRED_WOMPI_FUNCTION', 'pos.fun_recibos_wompi_es_sin_pago_vencido'),
+            ],
+        ],
+        'customer_sync' => [
+            'enabled' => filter_var(env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'skip_enterprise_operational_centers' => array_values(array_filter(array_map(
+                'trim',
+                explode(',', (string) env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_SKIP_COS', 'A40,A06'))
+            ))),
+            'tables' => [
+                'receipts' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_RECEIPTS_TABLE', env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado')),
+                'customers' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_CUSTOMERS_TABLE', 'pos.clientes'),
+                'customer_classes' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_CLASSES_TABLE', 'pos.clase_de_cliente'),
+                'id_types' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ID_TYPES_TABLE', 'maestros_uno.untipoid_catalogo_tipos_identificacion'),
+                'type_equivalences' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_TYPE_EQUIVALENCES_TABLE', 'prototipos.equivalencia_tipo_cliente'),
+                'cities_ica' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_CITIES_ICA_TABLE', 'prototipos.ciudades_ica'),
+                'customer_class_groups' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_CLASS_GROUPS_TABLE', 'maestros.clase_cliente_grupo'),
+                'customer_class_master' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_CLASS_MASTER_TABLE', 'maestros.clase_cliente'),
+            ],
+            'enterprise_tables' => [
+                'third_parties' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ENTERPRISE_THIRD_PARTIES_TABLE', 'SiesaEnterprise.dbo.t200_mm_terceros'),
+                'clients' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ENTERPRISE_CLIENTS_TABLE', 'SiesaEnterprise.dbo.t201_mm_clientes'),
+                'client_criteria' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ENTERPRISE_CLIENT_CRITERIA_TABLE', 'SiesaEnterprise.dbo.t207_mm_criterios_clientes'),
+                'major_criteria' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ENTERPRISE_MAJOR_CRITERIA_TABLE', 'SiesaEnterprise.dbo.t206_mm_criterios_mayores'),
+            ],
+        ],
     ],
 
     'processes' => [

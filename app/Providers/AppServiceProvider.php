@@ -3,6 +3,8 @@
 namespace App\Providers;
 
 use App\Contracts\BackofficeAuthClientInterface;
+use App\Contracts\ReceiptCustomerSyncDataSourceInterface;
+use App\Contracts\ReceiptPreMigrationDataSourceInterface;
 use App\Services\Auth\BackofficeAuthHttpClient;
 use App\Services\Auth\WorkerHubOperatorSessionManager;
 use App\Services\Health\WorkerHubHealthService;
@@ -12,12 +14,17 @@ use App\Services\Kafka\WorkerTaskConsumer;
 use App\Services\Workers\DocumentMigrationService;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
+use App\Services\Workers\Receipts\ReceiptCustomerSyncLineFactory;
+use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
+use App\Services\Workers\Receipts\ReceiptLineFactory;
+use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
+use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\Receipts\SqlReceiptCustomerSyncDataSource;
+use App\Services\Workers\Receipts\SqlReceiptPreMigrationDataSource;
+use App\Services\Workers\WorkerOperationLogService;
 use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskNotificationService;
-use App\Services\Workers\WorkerOperationLogService;
-use App\Services\Workers\Receipts\ReceiptLineFactory;
-use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
 use App\Services\Workers\WorkerTaskReplayService;
 use App\Services\Workers\WorkerTaskRouter;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +37,8 @@ class AppServiceProvider extends ServiceProvider
     public function register(): void
     {
         $this->app->singleton(BackofficeAuthClientInterface::class, BackofficeAuthHttpClient::class);
+        $this->app->singleton(ReceiptPreMigrationDataSourceInterface::class, SqlReceiptPreMigrationDataSource::class);
+        $this->app->singleton(ReceiptCustomerSyncDataSourceInterface::class, SqlReceiptCustomerSyncDataSource::class);
         $this->app->singleton(WorkerHubOperatorSessionManager::class);
         $this->app->singleton(WorkerHubHealthService::class);
         $this->app->singleton(KafkaConfigFactory::class);
@@ -38,6 +47,9 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(DocumentMigrationService::class);
         $this->app->singleton(ReceiptPrototypeRepository::class);
         $this->app->singleton(ReceiptLineFactory::class);
+        $this->app->singleton(ReceiptCustomerSyncLineFactory::class);
+        $this->app->singleton(ReceiptPreMigrationGuard::class);
+        $this->app->singleton(ReceiptCustomerSyncService::class);
         $this->app->singleton(ReceiptMigrationService::class);
         $this->app->singleton(WorkerTaskDispatchService::class);
         $this->app->singleton(WorkerTaskNotificationService::class);

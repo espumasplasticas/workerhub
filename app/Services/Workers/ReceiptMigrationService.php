@@ -3,7 +3,9 @@
 namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
+use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
 use Epsalibrary\Contracts\ImportManagerInterface;
 
@@ -12,19 +14,23 @@ class ReceiptMigrationService
     public function __construct(
         private readonly ImportManagerInterface $importManager,
         private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
+        private readonly ReceiptPreMigrationGuard $preMigrationGuard,
         private readonly ReceiptPrototypeRepository $repository,
+        private readonly ReceiptCustomerSyncService $customerSyncService,
         private readonly ReceiptLineFactory $lineFactory
     ) {
     }
 
     public function handle(array $payload): array
     {
+        $preMigrationSnapshot = $this->preMigrationGuard->assertCanMigrate($payload);
         $header = $this->repository->findHeader($payload);
-        $payments = $this->repository->findPayments($payload);
-        $lines = $this->lineFactory->build($header, $payments);
 
         $this->soapConfigurationValidator->validate();
 
+        $customerSync = $this->customerSyncService->sync($payload, $header);
+        $payments = $this->repository->findPayments($payload);
+        $lines = $this->lineFactory->build($header, $payments);
         $result = $this->importManager->import($lines);
 
         if (!$result->success) {
@@ -47,6 +53,8 @@ class ReceiptMigrationService
             'line_count' => count($lines),
             'payment_count' => count($payments),
             'receipt_reference' => $this->buildReference($payload),
+            'pre_migration' => $preMigrationSnapshot->toArray(),
+            'customer_sync' => $customerSync,
         ];
     }
 
