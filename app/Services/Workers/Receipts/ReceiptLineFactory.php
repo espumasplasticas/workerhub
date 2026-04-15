@@ -2,7 +2,6 @@
 
 namespace App\Services\Workers\Receipts;
 
-use Epsalibrary\Legacy\Adapters\Receipts\LegacyReceiptCrossReferenceAdapter;
 use Epsalibrary\Legacy\Adapters\Receipts\LegacyReceiptHeaderAdapter;
 use Epsalibrary\Legacy\Adapters\Receipts\LegacyReceiptPaymentAdapter;
 use Epsalibrary\Siesa\Connectors\PrototipoReciboCaja;
@@ -28,8 +27,6 @@ class ReceiptLineFactory
                 $this->toPaymentConnector($paymentRow)
             ))->toLine();
         }
-
-        $lines[] = LegacyReceiptCrossReferenceAdapter::fromReceiptHeader($headerConnector)->toLine();
 
         return $lines;
     }

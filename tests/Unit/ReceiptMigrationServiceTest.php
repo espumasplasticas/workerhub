@@ -131,20 +131,19 @@ class ReceiptMigrationServiceTest extends TestCase
             ->once()
             ->with(
                 Mockery::on(function (array $lines): bool {
-                    return count($lines) === 15
+                    return count($lines) === 14
                         && str_starts_with($lines[0], '0200')
                         && str_starts_with($lines[1], '0201')
                         && str_starts_with($lines[11], '0207')
                         && str_starts_with($lines[12], '035700')
-                        && str_starts_with($lines[13], '035701')
-                        && str_starts_with($lines[14], '035702');
+                        && str_starts_with($lines[13], '035701');
                 }),
                 Mockery::on(function (array $context): bool {
                     return $context['task_type'] === 'receipt_migration'
                         && $context['document_id'] === '001-RX-1001'
                         && $context['import_stage'] === 'receipt_migration'
-                        && $context['line_count'] === 15
-                        && $context['receipt_line_count'] === 3
+                        && $context['line_count'] === 14
+                        && $context['receipt_line_count'] === 2
                         && $context['customer_sync_line_count'] === 12
                         && $context['payment_count'] === 1;
                 })
@@ -175,8 +174,8 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $this->assertSame('001-RX-1001', $result['document_id']);
         $this->assertSame('Recibo importado', $result['message']);
-        $this->assertSame(15, $result['line_count']);
-        $this->assertSame(3, $result['receipt_line_count']);
+        $this->assertSame(14, $result['line_count']);
+        $this->assertSame(2, $result['receipt_line_count']);
         $this->assertSame(12, $result['customer_sync_line_count']);
         $this->assertSame(1, $result['payment_count']);
         $this->assertSame(100000.0, $result['pre_migration']['legalized_amount']);

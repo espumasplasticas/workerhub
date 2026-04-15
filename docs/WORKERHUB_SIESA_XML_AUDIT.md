@@ -36,19 +36,18 @@ Se registra XML previo para:
 
 ## Documento de cruce en recibos
 
-`WorkerHub` valida por defecto que el documento de cruce del recibo exista en `SiesaEnterprise.dbo.t353_co_saldo_abierto`.
+`WorkerHub` puede validar opcionalmente que el documento de cruce del recibo exista en `SiesaEnterprise.dbo.t353_co_saldo_abierto`, pero el comportamiento legacy por defecto es no bloquear ni agregar una linea `0357-02`.
 
-Configuracion:
+Configuracion opcional:
 
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_GUARD_ENABLED=false`
+  Comportamiento default alineado al legacy.
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_GUARD_ENABLED=true`
+  Activa la validacion previa del cruce.
 - `WORKERHUB_RECEIPT_CROSS_REFERENCE_MODE=strict`
-  Bloquea el recibo antes del XML final si el cruce no existe.
+  Si la validacion esta activa, bloquea el recibo antes del XML final cuando el cruce no existe.
 - `WORKERHUB_RECEIPT_CROSS_REFERENCE_MODE=warn`
-  Deja continuar la importacion, registra el XML final en `siesa_web_services` y permite ver el rechazo real del WS de Siesa.
-
-Default versionado:
-
-- `APP_ENV=local|dev|development` => `warn`
-- cualquier otro ambiente => `strict`
+  Si la validacion esta activa, deja continuar la importacion y permite ver el rechazo real del WS de Siesa.
 
 El valor explicito en `.env` o `.env.docker` sigue teniendo prioridad.
 
@@ -62,3 +61,4 @@ Esto permite:
 - comparar reintentos contra el payload previo
 - auditar fallos de cliente, documento de cruce y otros rechazos funcionales
 - conservar el comportamiento historico de `siesa_web_services` sin depender ya de `intranetlocal`
+
