@@ -27,45 +27,80 @@ class ReceiptCustomerSyncService
             return [
                 'status' => 'disabled',
                 'line_count' => 0,
-                'snapshot' => null,
+                'parties' => [],
             ];
         }
 
-        $snapshot = $this->dataSource->fetch(
-            $payload,
-            trim((string) ($receiptHeader->F350_ID_CO ?? ''))
-        );
+        $enterpriseOperationalCenter = trim((string) ($receiptHeader->F350_ID_CO ?? ''));
+        $snapshots = [
+            'receipt_customer' => $this->dataSource->fetch($payload, $enterpriseOperationalCenter),
+        ];
 
-        if (!$snapshot->shouldSync) {
-            return [
-                'status' => 'skipped',
-                'line_count' => 0,
-                'snapshot' => $snapshot->toArray(),
-            ];
-        }
+        $otherIncomeThirdParty = trim((string) ($receiptHeader->F351_ID_TERCERO_OTRO_ING ?? ''));
+        $receiptCustomer = trim((string) ($receiptHeader->F350_ID_TERCERO ?? ''));
 
-        $lines = $this->lineFactory->build($snapshot);
-        $result = $this->importManager->import($lines);
-
-        if (!$result->success) {
-            throw new WorkerTaskProcessingException(
-                'Fallo importando tercero/cliente previo al recibo.',
-                [
-                    'errors' => $result->errors,
-                    'payload' => $payload,
-                    'customer_sync' => $snapshot->toArray(),
-                    'xml_payload' => $result->payload,
-                ]
+        if ($otherIncomeThirdParty !== '' && $otherIncomeThirdParty !== $receiptCustomer) {
+            $snapshots['other_income_third_party'] = $this->dataSource->fetchThirdParty(
+                $payload,
+                $otherIncomeThirdParty,
+                trim((string) ($receiptHeader->F351_ID_SUCURSAL_OTRO_ING ?? '')),
+                $enterpriseOperationalCenter
             );
         }
 
+        $lineCount = 0;
+        $parties = [];
+        $messages = [];
+        $syncedCount = 0;
+
+        foreach ($snapshots as $role => $snapshot) {
+            if (!$snapshot->shouldSync) {
+                $parties[] = [
+                    'role' => $role,
+                    'status' => 'skipped',
+                    'line_count' => 0,
+                    'snapshot' => $snapshot->toArray(),
+                ];
+
+                continue;
+            }
+
+            $lines = $this->lineFactory->build($snapshot);
+            $result = $this->importManager->import($lines);
+
+            if (!$result->success) {
+                throw new WorkerTaskProcessingException(
+                    sprintf('Fallo importando tercero/cliente previo al recibo (%s).', $role),
+                    [
+                        'errors' => $result->errors,
+                        'payload' => $payload,
+                        'customer_sync_role' => $role,
+                        'customer_sync' => $snapshot->toArray(),
+                        'xml_payload' => $result->payload,
+                    ]
+                );
+            }
+
+            $lineCount += count($lines);
+            $syncedCount++;
+            $messages[] = $result->message;
+            $parties[] = [
+                'role' => $role,
+                'status' => 'synced',
+                'line_count' => count($lines),
+                'message' => $result->message,
+                'errors' => $result->errors,
+                'snapshot' => $snapshot->toArray(),
+                'import_payload' => $result->payload,
+            ];
+        }
+
         return [
-            'status' => 'synced',
-            'line_count' => count($lines),
-            'message' => $result->message,
-            'errors' => $result->errors,
-            'snapshot' => $snapshot->toArray(),
-            'import_payload' => $result->payload,
+            'status' => $syncedCount > 0 ? 'synced' : 'skipped',
+            'line_count' => $lineCount,
+            'synced_parties' => $syncedCount,
+            'parties' => $parties,
+            'messages' => $messages,
         ];
     }
 

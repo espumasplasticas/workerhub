@@ -4,8 +4,10 @@ namespace Tests\Unit;
 
 use App\Data\Receipts\ReceiptPreMigrationSnapshot;
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Data\Receipts\ReceiptCrossReferenceSnapshot;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
+use App\Services\Workers\Receipts\ReceiptCrossReferenceGuard;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
@@ -103,6 +105,19 @@ class ReceiptMigrationServiceTest extends TestCase
                 'line_count' => 12,
             ]);
 
+        $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
+        $crossReferenceGuard->shouldReceive('assertExists')
+            ->once()
+            ->andReturn(new ReceiptCrossReferenceSnapshot(
+                auxiliaryId: '28050505',
+                operationalCenter: '001',
+                unit: '02',
+                branch: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                exists: true,
+            ));
+
         $lineFactory = new ReceiptLineFactory();
 
         $importManager = Mockery::mock(ImportManagerInterface::class);
@@ -121,6 +136,7 @@ class ReceiptMigrationServiceTest extends TestCase
             $validator,
             $guard,
             $repository,
+            $crossReferenceGuard,
             $customerSync,
             $lineFactory
         );
@@ -139,6 +155,7 @@ class ReceiptMigrationServiceTest extends TestCase
         $this->assertSame(3, $result['line_count']);
         $this->assertSame(1, $result['payment_count']);
         $this->assertSame(100000.0, $result['pre_migration']['legalized_amount']);
+        $this->assertTrue($result['cross_reference']['exists']);
         $this->assertSame('synced', $result['customer_sync']['status']);
     }
 
@@ -173,6 +190,19 @@ class ReceiptMigrationServiceTest extends TestCase
                 'line_count' => 0,
             ]);
 
+        $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
+        $crossReferenceGuard->shouldReceive('assertExists')
+            ->once()
+            ->andReturn(new ReceiptCrossReferenceSnapshot(
+                auxiliaryId: '28050505',
+                operationalCenter: '001',
+                unit: '02',
+                branch: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                exists: true,
+            ));
+
         $lineFactory = Mockery::mock(ReceiptLineFactory::class);
         $lineFactory->shouldReceive('build')->once()->andReturn(['035700...', '035701...', '035702...']);
 
@@ -186,6 +216,7 @@ class ReceiptMigrationServiceTest extends TestCase
             $validator,
             $guard,
             $repository,
+            $crossReferenceGuard,
             $customerSync,
             $lineFactory
         );

@@ -34,6 +34,140 @@ class SqlReceiptCustomerSyncDataSource implements ReceiptCustomerSyncDataSourceI
         }
 
         $customer = $this->findCustomer($connection, $thirdPartyId, $sourceBranch);
+
+        return $this->buildSnapshot($connection, $customer, $enterpriseOperationalCenter);
+    }
+
+    public function fetchThirdParty(
+        array $payload,
+        string $thirdPartyId,
+        ?string $branchHint,
+        string $enterpriseOperationalCenter
+    ): ReceiptCustomerSyncSnapshot {
+        $reference = $this->resolveReference($payload);
+        $connection = $this->connectionFor($reference['db_connection']);
+        $customer = $this->findCustomerByThirdParty($connection, trim($thirdPartyId), $branchHint);
+
+        return $this->buildSnapshot($connection, $customer, $enterpriseOperationalCenter);
+    }
+
+    /**
+     * @param array{operational_center: string, document_type: string, document_number: string} $reference
+     */
+    private function findReceipt(ConnectionInterface $connection, array $reference): stdClass
+    {
+        $receipt = $connection
+            ->table($this->receiptTable())
+            ->select([
+                'RE_CodigoTercero',
+                'RE_CodigoSucursal',
+            ])
+            ->where('RE_CentroOperativo', $reference['operational_center'])
+            ->where('RE_TipoDocumento', $reference['document_type'])
+            ->where('RE_NumeroDocumento', $reference['document_number'])
+            ->first();
+
+        if (!$receipt instanceof stdClass) {
+            throw new WorkerTaskProcessingException(
+                'No se encontro el recibo para sincronizar tercero antes de migrar.',
+                ['reference' => $reference]
+            );
+        }
+
+        return $receipt;
+    }
+
+    private function findCustomer(ConnectionInterface $connection, string $thirdPartyId, string $sourceBranch): stdClass
+    {
+        $customer = $connection
+            ->table($this->customersTable())
+            ->where('CL_CodigoTercero', $thirdPartyId)
+            ->where('CL_Sucursal', $sourceBranch)
+            ->first();
+
+        if (!$customer instanceof stdClass) {
+            throw new WorkerTaskProcessingException(
+                sprintf(
+                    'No se encontro el cliente %s sucursal %s para sincronizar antes del recibo.',
+                    $thirdPartyId,
+                    $sourceBranch
+                ),
+                ['third_party_id' => $thirdPartyId, 'source_branch' => $sourceBranch]
+            );
+        }
+
+        return $customer;
+    }
+
+    private function findCustomerByThirdParty(ConnectionInterface $connection, string $thirdPartyId, ?string $branchHint): stdClass
+    {
+        if ($thirdPartyId === '') {
+            throw new WorkerTaskProcessingException('El encabezado del recibo no informa el tercero dependiente a sincronizar.');
+        }
+
+        $customers = $connection
+            ->table($this->customersTable())
+            ->where('CL_CodigoTercero', $thirdPartyId)
+            ->get();
+
+        if ($customers->isEmpty()) {
+            throw new WorkerTaskProcessingException(
+                sprintf('No se encontro el tercero dependiente %s en la tabla de clientes POS.', $thirdPartyId),
+                ['third_party_id' => $thirdPartyId, 'branch_hint' => $branchHint]
+            );
+        }
+
+        $normalizedHint = $this->normalizeEnterpriseBranch($branchHint);
+        $sourceHint = $this->normalizeSourceBranchHint($branchHint);
+
+        foreach ($customers as $customer) {
+            $sourceBranch = trim((string) ($customer->CL_Sucursal ?? ''));
+
+            if ($sourceHint !== '' && $sourceBranch === $sourceHint) {
+                return $customer;
+            }
+        }
+
+        foreach ($customers as $customer) {
+            $sourceBranch = trim((string) ($customer->CL_Sucursal ?? ''));
+
+            if ($normalizedHint !== '' && $this->enterpriseBranchForSourceBranch($sourceBranch) === $normalizedHint) {
+                return $customer;
+            }
+        }
+
+        return $customers->first();
+    }
+
+    private function findCustomerClass(ConnectionInterface $connection, string $customerClassId): stdClass
+    {
+        if ($customerClassId === '') {
+            throw new WorkerTaskProcessingException('El cliente del recibo no tiene clase de cliente configurada.');
+        }
+
+        $customerClass = $connection
+            ->table($this->customerClassesTable())
+            ->select(['CC_Id', 'CC_PermiteSeleccionar'])
+            ->where('CC_Id', $customerClassId)
+            ->first();
+
+        if (!$customerClass instanceof stdClass) {
+            throw new WorkerTaskProcessingException(
+                sprintf('La clase de cliente %s no existe para sincronizar el tercero.', $customerClassId),
+                ['customer_class_id' => $customerClassId]
+            );
+        }
+
+        return $customerClass;
+    }
+
+    private function buildSnapshot(
+        ConnectionInterface $connection,
+        stdClass $customer,
+        string $enterpriseOperationalCenter
+    ): ReceiptCustomerSyncSnapshot {
+        $thirdPartyId = trim((string) ($customer->CL_CodigoTercero ?? ''));
+        $sourceBranch = trim((string) ($customer->CL_Sucursal ?? '00'));
         $customerClassId = trim((string) ($customer->CL_ClaseDeCliente ?? ''));
         $customerClass = $this->findCustomerClass($connection, $customerClassId);
         $allowsSelection = (int) ($customerClass->CC_PermiteSeleccionar ?? 0) === 1;
@@ -92,76 +226,6 @@ class SqlReceiptCustomerSyncDataSource implements ReceiptCustomerSyncDataSourceI
             thirdPartyPrototype: $this->findThirdPartyPrototype($connection, $thirdPartyId, $sourceBranch),
             branchPrototype: $this->findBranchPrototype($connection, $thirdPartyId, $sourceBranch),
         );
-    }
-
-    /**
-     * @param array{operational_center: string, document_type: string, document_number: string} $reference
-     */
-    private function findReceipt(ConnectionInterface $connection, array $reference): stdClass
-    {
-        $receipt = $connection
-            ->table($this->receiptTable())
-            ->select([
-                'RE_CodigoTercero',
-                'RE_CodigoSucursal',
-            ])
-            ->where('RE_CentroOperativo', $reference['operational_center'])
-            ->where('RE_TipoDocumento', $reference['document_type'])
-            ->where('RE_NumeroDocumento', $reference['document_number'])
-            ->first();
-
-        if (!$receipt instanceof stdClass) {
-            throw new WorkerTaskProcessingException(
-                'No se encontro el recibo para sincronizar tercero antes de migrar.',
-                ['reference' => $reference]
-            );
-        }
-
-        return $receipt;
-    }
-
-    private function findCustomer(ConnectionInterface $connection, string $thirdPartyId, string $sourceBranch): stdClass
-    {
-        $customer = $connection
-            ->table($this->customersTable())
-            ->where('CL_CodigoTercero', $thirdPartyId)
-            ->where('CL_Sucursal', $sourceBranch)
-            ->first();
-
-        if (!$customer instanceof stdClass) {
-            throw new WorkerTaskProcessingException(
-                sprintf(
-                    'No se encontro el cliente %s sucursal %s para sincronizar antes del recibo.',
-                    $thirdPartyId,
-                    $sourceBranch
-                ),
-                ['third_party_id' => $thirdPartyId, 'source_branch' => $sourceBranch]
-            );
-        }
-
-        return $customer;
-    }
-
-    private function findCustomerClass(ConnectionInterface $connection, string $customerClassId): stdClass
-    {
-        if ($customerClassId === '') {
-            throw new WorkerTaskProcessingException('El cliente del recibo no tiene clase de cliente configurada.');
-        }
-
-        $customerClass = $connection
-            ->table($this->customerClassesTable())
-            ->select(['CC_Id', 'CC_PermiteSeleccionar'])
-            ->where('CC_Id', $customerClassId)
-            ->first();
-
-        if (!$customerClass instanceof stdClass) {
-            throw new WorkerTaskProcessingException(
-                sprintf('La clase de cliente %s no existe para sincronizar el tercero.', $customerClassId),
-                ['customer_class_id' => $customerClassId]
-            );
-        }
-
-        return $customerClass;
     }
 
     private function customerCanMigrate(
@@ -528,5 +592,44 @@ class SqlReceiptCustomerSyncDataSource implements ReceiptCustomerSyncDataSourceI
     private function enterpriseMajorCriteriaTable(): string
     {
         return (string) $this->config->get('workerhub.receipts.customer_sync.enterprise_tables.major_criteria', 'SiesaEnterprise.dbo.t206_mm_criterios_mayores');
+    }
+
+    private function enterpriseBranchForSourceBranch(string $sourceBranch): string
+    {
+        $branch = trim($sourceBranch);
+
+        if ($branch === '' || $branch === '00') {
+            return '001';
+        }
+
+        return str_pad(ltrim($branch, '0') === '' ? '0' : ltrim($branch, '0'), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function normalizeEnterpriseBranch(?string $branchHint): string
+    {
+        $branch = trim((string) $branchHint);
+
+        if ($branch === '') {
+            return '';
+        }
+
+        return str_pad(ltrim($branch, '0') === '' ? '0' : ltrim($branch, '0'), 3, '0', STR_PAD_LEFT);
+    }
+
+    private function normalizeSourceBranchHint(?string $branchHint): string
+    {
+        $branch = trim((string) $branchHint);
+
+        if ($branch === '') {
+            return '';
+        }
+
+        $normalizedEnterprise = $this->normalizeEnterpriseBranch($branch);
+
+        if ($normalizedEnterprise === '001') {
+            return '00';
+        }
+
+        return str_pad((string) ((int) $normalizedEnterprise), 2, '0', STR_PAD_LEFT);
     }
 }

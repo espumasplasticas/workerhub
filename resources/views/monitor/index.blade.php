@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>WorkerHub Monitor</title>
     <style>
         :root {
@@ -906,7 +907,18 @@ function hydrateFilters() {
 }
 
 function operatorHeaders() {
-    return window.workerhubOperatorToken ? { 'X-WorkerHub-Token': window.workerhubOperatorToken } : {};
+    const headers = {};
+    const csrfToken = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+
+    if (csrfToken) {
+        headers['X-CSRF-TOKEN'] = csrfToken;
+    }
+
+    if (window.workerhubOperatorToken) {
+        headers['X-WorkerHub-Token'] = window.workerhubOperatorToken;
+    }
+
+    return headers;
 }
 
 function buildTokenQuery() {
@@ -1037,7 +1049,10 @@ function closeDetailModal() {
 }
 
 async function fetchJson(url) {
-    const response = await fetch(url, { headers: { 'Accept': 'application/json', ...operatorHeaders() } });
+    const response = await fetch(url, {
+        headers: { 'Accept': 'application/json', ...operatorHeaders() },
+        credentials: 'same-origin',
+    });
     if (!response.ok) {
         throw new Error(`Request failed: ${response.status}`);
     }

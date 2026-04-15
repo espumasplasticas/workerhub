@@ -49,7 +49,7 @@ class ReceiptCustomerSyncServiceTest extends TestCase
         );
 
         $this->assertSame('skipped', $result['status']);
-        $this->assertSame('enterprise_operational_center_skipped', $result['snapshot']['skip_reason']);
+        $this->assertSame('enterprise_operational_center_skipped', $result['parties'][0]['snapshot']['skip_reason']);
     }
 
     public function test_it_imports_customer_lines_before_the_receipt_when_required(): void
@@ -99,6 +99,7 @@ class ReceiptCustomerSyncServiceTest extends TestCase
 
         $this->assertSame('synced', $result['status']);
         $this->assertSame(12, $result['line_count']);
+        $this->assertSame('receipt_customer', $result['parties'][0]['role']);
     }
 
     public function test_it_stops_the_receipt_when_customer_sync_import_fails(): void
@@ -136,7 +137,7 @@ class ReceiptCustomerSyncServiceTest extends TestCase
         );
 
         $this->expectException(WorkerTaskProcessingException::class);
-        $this->expectExceptionMessage('Fallo importando tercero/cliente previo al recibo.');
+        $this->expectExceptionMessage('Fallo importando tercero/cliente previo al recibo (receipt_customer).');
 
         $service->sync(
             ['document_id' => '002-FC-24088'],
@@ -144,14 +145,86 @@ class ReceiptCustomerSyncServiceTest extends TestCase
         );
     }
 
+    public function test_it_syncs_the_other_income_third_party_when_receipt_header_references_a_different_party(): void
+    {
+        config()->set('workerhub.receipts.customer_sync.enabled', true);
+
+        $primarySnapshot = new ReceiptCustomerSyncSnapshot(
+            enterpriseOperationalCenter: '001',
+            thirdPartyId: '900123',
+            sourceBranch: '00',
+            customerClassId: '50',
+            allowsSelection: true,
+            canMigrate: false,
+            shouldSync: false,
+            skipReason: 'customer_not_allowed_to_migrate',
+        );
+
+        $dependentSnapshot = new ReceiptCustomerSyncSnapshot(
+            enterpriseOperationalCenter: '001',
+            thirdPartyId: '12364578',
+            sourceBranch: '00',
+            customerClassId: '50',
+            allowsSelection: true,
+            canMigrate: true,
+            shouldSync: true,
+            skipReason: null,
+            thirdPartyPrototype: $this->thirdPartyPrototype('12364578'),
+            branchPrototype: $this->branchPrototype('12364578'),
+        );
+
+        $importManager = Mockery::mock(ImportManagerInterface::class);
+        $importManager->shouldReceive('import')
+            ->once()
+            ->andReturn(new ImportResult(true, 'Tercero auxiliar sincronizado', [], '<Envelope />'));
+
+        $dataSource = Mockery::mock(ReceiptCustomerSyncDataSourceInterface::class);
+        $dataSource->shouldReceive('fetch')
+            ->once()
+            ->andReturn($primarySnapshot);
+        $dataSource->shouldReceive('fetchThirdParty')
+            ->once()
+            ->withArgs(function (array $payload, string $thirdPartyId, ?string $branchHint, string $enterpriseCo): bool {
+                return $payload['document_id'] === '002-FC-24089'
+                    && $thirdPartyId === '12364578'
+                    && $branchHint === '001'
+                    && $enterpriseCo === '001';
+            })
+            ->andReturn($dependentSnapshot);
+
+        $service = new ReceiptCustomerSyncService(
+            $importManager,
+            $dataSource,
+            new ReceiptCustomerSyncLineFactory(),
+            app('config')
+        );
+
+        $result = $service->sync(
+            ['document_id' => '002-FC-24089'],
+            (object) [
+                'F350_ID_CO' => '001',
+                'F350_ID_TERCERO' => '900123',
+                'F351_ID_TERCERO_OTRO_ING' => '12364578',
+                'F351_ID_SUCURSAL_OTRO_ING' => '001',
+            ]
+        );
+
+        $this->assertSame('synced', $result['status']);
+        $this->assertSame(12, $result['line_count']);
+        $this->assertCount(2, $result['parties']);
+        $this->assertSame('skipped', $result['parties'][0]['status']);
+        $this->assertSame('other_income_third_party', $result['parties'][1]['role']);
+        $this->assertSame('12364578', $result['parties'][1]['snapshot']['third_party_id']);
+    }
+
     /**
      * @return array<string, mixed>
      */
-    private function thirdPartyPrototype(): array
+    private function thirdPartyPrototype(string $thirdPartyId = '900123'): array
     {
         return [
-            'F200_ID' => '900123',
-            'F200_NIT' => '900123',
+            'F200_ID' => $thirdPartyId,
+            'F200_NIT' => $thirdPartyId,
             'F200_DV_NIT' => '1',
             'F200_ID_TIPO_IDENT' => 'N',
             'F200_IND_TIPO_TERCERO' => 2,
@@ -186,10 +259,10 @@ class ReceiptCustomerSyncServiceTest extends TestCase
     /**
      * @return array<string, mixed>
      */
-    private function branchPrototype(): array
+    private function branchPrototype(string $thirdPartyId = '900123'): array
     {
         return [
-            'F201_ID_TERCERO' => '900123',
+            'F201_ID_TERCERO' => $thirdPartyId,
             'F201_ID_SUCURSAL' => '001',
             'F201_IND_ESTADO_ACTIVO' => 1,
             'F201_DESCRIPCION_SUCURSAL' => 'CASA MATRIZ',

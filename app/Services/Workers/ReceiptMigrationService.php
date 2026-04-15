@@ -3,6 +3,7 @@
 namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Services\Workers\Receipts\ReceiptCrossReferenceGuard;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
@@ -16,6 +17,7 @@ class ReceiptMigrationService
         private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
         private readonly ReceiptPreMigrationGuard $preMigrationGuard,
         private readonly ReceiptPrototypeRepository $repository,
+        private readonly ReceiptCrossReferenceGuard $crossReferenceGuard,
         private readonly ReceiptCustomerSyncService $customerSyncService,
         private readonly ReceiptLineFactory $lineFactory
     ) {
@@ -28,6 +30,7 @@ class ReceiptMigrationService
 
         $this->soapConfigurationValidator->validate();
 
+        $crossReference = $this->crossReferenceGuard->assertExists($payload, $header);
         $customerSync = $this->customerSyncService->sync($payload, $header);
         $payments = $this->repository->findPayments($payload);
         $lines = $this->lineFactory->build($header, $payments);
@@ -54,6 +57,7 @@ class ReceiptMigrationService
             'payment_count' => count($payments),
             'receipt_reference' => $this->buildReference($payload),
             'pre_migration' => $preMigrationSnapshot->toArray(),
+            'cross_reference' => $crossReference->toArray(),
             'customer_sync' => $customerSync,
         ];
     }

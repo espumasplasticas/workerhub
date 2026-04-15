@@ -141,6 +141,15 @@ return [
                 'major_criteria' => env('WORKERHUB_RECEIPT_CUSTOMER_SYNC_ENTERPRISE_MAJOR_CRITERIA_TABLE', 'SiesaEnterprise.dbo.t206_mm_criterios_mayores'),
             ],
         ],
+        'cross_reference' => [
+            'enabled' => filter_var(env('WORKERHUB_RECEIPT_CROSS_REFERENCE_GUARD_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'auxiliary_id' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_AUXILIARY_ID', '28050505'),
+            'unit' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_UNIT', '02'),
+            'enterprise_tables' => [
+                'open_balances' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_OPEN_BALANCES_TABLE', 'SiesaEnterprise.dbo.t353_co_saldo_abierto'),
+                'auxiliaries' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_AUXILIARIES_TABLE', 'SiesaEnterprise.dbo.t253_co_auxiliares'),
+            ],
+        ],
     ],
 
     'processes' => [

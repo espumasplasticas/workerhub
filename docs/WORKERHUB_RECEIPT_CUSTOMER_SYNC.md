@@ -1,4 +1,4 @@
-# WorkerHub: Sync previo de tercero para recibos
+# WorkerHub: Sync previo de terceros y guardas de cruce para recibos
 
 ## Objetivo
 
@@ -6,13 +6,15 @@ Antes de importar un `receipt_migration`, `WorkerHub` replica la validacion hist
 
 1. valida que el recibo ya pueda migrarse,
 2. sincroniza tercero/cliente/sucursal en Siesa cuando aplica,
-3. solo despues importa el recibo.
+3. valida que el documento de cruce exista en cartera abierta,
+4. solo despues importa el recibo.
 
 Con esto se evita el rechazo clasico de Siesa por:
 
 - tercero inexistente,
 - sucursal inexistente,
 - criterios de cliente faltantes.
+- documento de cruce inexistente.
 
 ## Origen legacy
 
@@ -33,6 +35,10 @@ El paso critico era `crearTercero(...)` antes de escribir el encabezado del reci
 - `ReceiptCustomerSyncLineFactory`
 - `ReceiptCustomerSyncService`
 - `ReceiptCustomerSyncSnapshot`
+- `ReceiptCrossReferenceDataSourceInterface`
+- `SqlReceiptCrossReferenceDataSource`
+- `ReceiptCrossReferenceGuard`
+- `ReceiptCrossReferenceSnapshot`
 
 ### Flujo
 
@@ -41,9 +47,10 @@ El paso critico era `crearTercero(...)` antes de escribir el encabezado del reci
 1. `ReceiptPreMigrationGuard`
 2. `ReceiptPrototypeRepository->findHeader()`
 3. `EpsaSoapConfigurationValidator`
-4. `ReceiptCustomerSyncService->sync(...)`
-5. carga medios de pago
-6. importa el recibo
+4. `ReceiptCrossReferenceGuard->assertExists(...)`
+5. `ReceiptCustomerSyncService->sync(...)`
+6. carga medios de pago
+7. importa el recibo
 
 ## Reglas portadas
 
@@ -70,6 +77,24 @@ Se importan estas lineas, en este orden:
 11. criterio `SEC`
 12. criterio `SED`
 
+### Terceros dependientes del encabezado
+
+Si el recibo referencia un tercero distinto en:
+
+- `F351_ID_TERCERO_OTRO_ING`
+- `F351_ID_SUCURSAL_OTRO_ING`
+
+`WorkerHub` intenta sincronizar tambien ese tercero auxiliar antes de enviar el `0357`.
+
+### Guarda de documento de cruce
+
+Antes del import, `WorkerHub` valida en `SiesaEnterprise` que exista una fila abierta en:
+
+- `t353_co_saldo_abierto`
+- ligada al auxiliar configurado, por defecto `28050505`
+
+usando centro operativo, unidad, sucursal, tipo y consecutivo de cruce.
+
 ## Configuracion
 
 Se agrego el bloque:
@@ -82,6 +107,10 @@ Variables mas importantes:
 - `WORKERHUB_RECEIPT_CUSTOMER_SYNC_SKIP_COS`
 - tablas fuente de clientes/clases/prototipos
 - tablas enterprise para terceros/clientes/criterios
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_GUARD_ENABLED`
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_AUXILIARY_ID`
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_UNIT`
+- tablas enterprise de `open_balances` y `auxiliaries`
 
 ## Pruebas
 
@@ -89,6 +118,7 @@ Se dejaron pruebas unitarias sin base de datos:
 
 - `ReceiptCustomerSyncLineFactoryTest`
 - `ReceiptCustomerSyncServiceTest`
+- `ReceiptCrossReferenceGuardTest`
 - ajuste de `ReceiptMigrationServiceTest`
 
 Las pruebas mockean datasource e import manager; no abren conexiones SQL.
