@@ -2,19 +2,19 @@
 
 namespace Tests\Unit;
 
-use App\Data\Receipts\ReceiptPreMigrationSnapshot;
-use App\Exceptions\WorkerTaskProcessingException;
 use App\Data\Receipts\ReceiptCrossReferenceSnapshot;
+use App\Data\Receipts\ReceiptPreMigrationSnapshot;
+use App\Data\SiesaWebServiceLogRecord;
+use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
-use App\Data\SiesaWebServiceLogRecord;
-use App\Services\Workers\SiesaImportAuditResult;
-use App\Services\Workers\SiesaImportAuditService;
 use App\Services\Workers\Receipts\ReceiptCrossReferenceGuard;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\SiesaImportAuditResult;
+use App\Services\Workers\SiesaImportAuditService;
 use Epsalibrary\Results\ImportResult;
 use Mockery;
 use stdClass;
@@ -22,7 +22,7 @@ use Tests\TestCase;
 
 class ReceiptMigrationServiceTest extends TestCase
 {
-    public function test_it_imports_a_receipt_using_prototype_views_and_epsa_library(): void
+    public function test_it_imports_a_receipt_using_a_single_legacy_like_batch(): void
     {
         $header = (object) [
             'F350_ID_CO' => '001',
@@ -103,8 +103,12 @@ class ReceiptMigrationServiceTest extends TestCase
         $customerSync->shouldReceive('sync')
             ->once()
             ->andReturn([
-                'status' => 'synced',
+                'status' => 'prepared',
                 'line_count' => 12,
+                'lines' => $this->customerSyncLines(),
+                'parties' => [
+                    ['role' => 'receipt_customer', 'status' => 'prepared', 'line_count' => 12],
+                ],
             ]);
 
         $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
@@ -126,17 +130,22 @@ class ReceiptMigrationServiceTest extends TestCase
         $auditService->shouldReceive('import')
             ->once()
             ->with(
-                Mockery::on(static function (array $lines): bool {
-                    return count($lines) === 3
-                        && str_starts_with($lines[0], '035700')
-                        && str_starts_with($lines[1], '035701')
-                        && str_starts_with($lines[2], '035702');
+                Mockery::on(function (array $lines): bool {
+                    return count($lines) === 15
+                        && str_starts_with($lines[0], '0200')
+                        && str_starts_with($lines[1], '0201')
+                        && str_starts_with($lines[11], '0207')
+                        && str_starts_with($lines[12], '035700')
+                        && str_starts_with($lines[13], '035701')
+                        && str_starts_with($lines[14], '035702');
                 }),
-                Mockery::on(static function (array $context): bool {
+                Mockery::on(function (array $context): bool {
                     return $context['task_type'] === 'receipt_migration'
                         && $context['document_id'] === '001-RX-1001'
                         && $context['import_stage'] === 'receipt_migration'
-                        && $context['line_count'] === 3
+                        && $context['line_count'] === 15
+                        && $context['receipt_line_count'] === 3
+                        && $context['customer_sync_line_count'] === 12
                         && $context['payment_count'] === 1;
                 })
             )
@@ -166,11 +175,13 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $this->assertSame('001-RX-1001', $result['document_id']);
         $this->assertSame('Recibo importado', $result['message']);
-        $this->assertSame(3, $result['line_count']);
+        $this->assertSame(15, $result['line_count']);
+        $this->assertSame(3, $result['receipt_line_count']);
+        $this->assertSame(12, $result['customer_sync_line_count']);
         $this->assertSame(1, $result['payment_count']);
         $this->assertSame(100000.0, $result['pre_migration']['legalized_amount']);
         $this->assertTrue($result['cross_reference']['exists']);
-        $this->assertSame('synced', $result['customer_sync']['status']);
+        $this->assertSame('prepared', $result['customer_sync']['status']);
         $this->assertSame(101, $result['siesa_web_service']['id']);
     }
 
@@ -203,6 +214,8 @@ class ReceiptMigrationServiceTest extends TestCase
             ->andReturn([
                 'status' => 'skipped',
                 'line_count' => 0,
+                'lines' => [],
+                'parties' => [],
             ]);
 
         $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
@@ -249,5 +262,26 @@ class ReceiptMigrationServiceTest extends TestCase
             'document_type' => 'RX',
             'document_number' => '1001',
         ]);
+    }
+
+    /**
+     * @return list<string>
+     */
+    private function customerSyncLines(): array
+    {
+        return [
+            '0200-a',
+            '0201-b',
+            '0046-c',
+            '0046-d',
+            '0046-e',
+            '0047-f',
+            '0047-g',
+            '0047-h',
+            '0047-i',
+            '0047-j',
+            '0207-k',
+            '0207-l',
+        ];
     }
 }

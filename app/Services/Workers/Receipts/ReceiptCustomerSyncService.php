@@ -3,15 +3,12 @@
 namespace App\Services\Workers\Receipts;
 
 use App\Contracts\ReceiptCustomerSyncDataSourceInterface;
-use App\Exceptions\WorkerTaskProcessingException;
-use App\Services\Workers\SiesaImportAuditService;
 use Illuminate\Contracts\Config\Repository;
 use stdClass;
 
 class ReceiptCustomerSyncService
 {
     public function __construct(
-        private readonly SiesaImportAuditService $auditService,
         private readonly ReceiptCustomerSyncDataSourceInterface $dataSource,
         private readonly ReceiptCustomerSyncLineFactory $lineFactory,
         private readonly Repository $config
@@ -27,7 +24,10 @@ class ReceiptCustomerSyncService
             return [
                 'status' => 'disabled',
                 'line_count' => 0,
+                'prepared_parties' => 0,
+                'synced_parties' => 0,
                 'parties' => [],
+                'lines' => [],
             ];
         }
 
@@ -49,9 +49,9 @@ class ReceiptCustomerSyncService
         }
 
         $lineCount = 0;
+        $preparedCount = 0;
         $parties = [];
-        $messages = [];
-        $syncedCount = 0;
+        $lines = [];
 
         foreach ($snapshots as $role => $snapshot) {
             if (!$snapshot->shouldSync) {
@@ -65,55 +65,25 @@ class ReceiptCustomerSyncService
                 continue;
             }
 
-            $lines = $this->lineFactory->build($snapshot);
-            $audit = $this->auditService->import($lines, [
-                'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
-                'task_type' => $payload['_workerhub_task_type'] ?? 'receipt_migration',
-                'document_id' => $payload['document_id'] ?? null,
-                'source' => $payload['source'] ?? null,
-                'import_stage' => 'receipt_customer_sync',
-                'customer_sync_role' => $role,
-                'third_party_id' => $snapshot->thirdPartyId,
-                'source_branch' => $snapshot->sourceBranch,
-                'line_count' => count($lines),
-            ]);
-            $result = $audit->result;
-
-            if (!$result->success) {
-                throw new WorkerTaskProcessingException(
-                    sprintf('Fallo importando tercero/cliente previo al recibo (%s).', $role),
-                    [
-                        'errors' => $result->errors,
-                        'payload' => $payload,
-                        'customer_sync_role' => $role,
-                        'customer_sync' => $snapshot->toArray(),
-                        'siesa_web_service' => $audit->log->toArray(),
-                        'xml_payload' => $result->payload,
-                    ]
-                );
-            }
-
-            $lineCount += count($lines);
-            $syncedCount++;
-            $messages[] = $result->message;
+            $preparedLines = $this->lineFactory->build($snapshot);
+            $lines = array_merge($lines, $preparedLines);
+            $lineCount += count($preparedLines);
+            $preparedCount++;
             $parties[] = [
                 'role' => $role,
-                'status' => 'synced',
-                'line_count' => count($lines),
-                'message' => $result->message,
-                'errors' => $result->errors,
+                'status' => 'prepared',
+                'line_count' => count($preparedLines),
                 'snapshot' => $snapshot->toArray(),
-                'siesa_web_service' => $audit->log->toArray(),
-                'import_payload' => $result->payload,
             ];
         }
 
         return [
-            'status' => $syncedCount > 0 ? 'synced' : 'skipped',
+            'status' => $preparedCount > 0 ? 'prepared' : 'skipped',
             'line_count' => $lineCount,
-            'synced_parties' => $syncedCount,
+            'prepared_parties' => $preparedCount,
+            'synced_parties' => $preparedCount,
             'parties' => $parties,
-            'messages' => $messages,
+            'lines' => $lines,
         ];
     }
 

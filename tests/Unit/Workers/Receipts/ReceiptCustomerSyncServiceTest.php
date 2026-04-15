@@ -4,15 +4,9 @@ namespace Tests\Unit\Workers\Receipts;
 
 use App\Contracts\ReceiptCustomerSyncDataSourceInterface;
 use App\Data\Receipts\ReceiptCustomerSyncSnapshot;
-use App\Data\SiesaWebServiceLogRecord;
-use App\Exceptions\WorkerTaskProcessingException;
-use App\Services\Workers\SiesaImportAuditResult;
-use App\Services\Workers\SiesaImportAuditService;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncLineFactory;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
-use Epsalibrary\Results\ImportResult;
 use Mockery;
-use stdClass;
 use Tests\TestCase;
 
 class ReceiptCustomerSyncServiceTest extends TestCase
@@ -20,9 +14,6 @@ class ReceiptCustomerSyncServiceTest extends TestCase
     public function test_it_skips_customer_sync_when_the_snapshot_does_not_require_it(): void
     {
         config()->set('workerhub.receipts.customer_sync.enabled', true);
-
-        $auditService = Mockery::mock(SiesaImportAuditService::class);
-        $auditService->shouldNotReceive('import');
 
         $dataSource = Mockery::mock(ReceiptCustomerSyncDataSourceInterface::class);
         $dataSource->shouldReceive('fetch')
@@ -39,7 +30,6 @@ class ReceiptCustomerSyncServiceTest extends TestCase
             ));
 
         $service = new ReceiptCustomerSyncService(
-            $auditService,
             $dataSource,
             new ReceiptCustomerSyncLineFactory(),
             app('config')
@@ -51,10 +41,12 @@ class ReceiptCustomerSyncServiceTest extends TestCase
         );
 
         $this->assertSame('skipped', $result['status']);
+        $this->assertSame(0, $result['line_count']);
+        $this->assertSame([], $result['lines']);
         $this->assertSame('enterprise_operational_center_skipped', $result['parties'][0]['snapshot']['skip_reason']);
     }
 
-    public function test_it_imports_customer_lines_before_the_receipt_when_required(): void
+    public function test_it_prepares_customer_lines_before_the_receipt_when_required(): void
     {
         config()->set('workerhub.receipts.customer_sync.enabled', true);
 
@@ -71,37 +63,12 @@ class ReceiptCustomerSyncServiceTest extends TestCase
             branchPrototype: $this->branchPrototype(),
         );
 
-        $auditService = Mockery::mock(SiesaImportAuditService::class);
-        $auditService->shouldReceive('import')
-            ->once()
-            ->with(
-                Mockery::on(static function (array $lines): bool {
-                    return count($lines) === 12
-                        && str_starts_with($lines[0], '0200')
-                        && str_starts_with($lines[1], '0201')
-                        && str_starts_with($lines[10], '0207');
-                }),
-                Mockery::on(static function (array $context): bool {
-                    return $context['task_type'] === 'receipt_migration'
-                        && $context['document_id'] === '002-FC-24088'
-                        && $context['import_stage'] === 'receipt_customer_sync'
-                        && $context['customer_sync_role'] === 'receipt_customer'
-                        && $context['third_party_id'] === '900123'
-                        && $context['line_count'] === 12;
-                })
-            )
-            ->andReturn(new SiesaImportAuditResult(
-                new SiesaWebServiceLogRecord(301, '<Envelope />', ['customer_sync_role' => 'receipt_customer']),
-                new ImportResult(true, 'Cliente sincronizado', [], '<Envelope />')
-            ));
-
         $dataSource = Mockery::mock(ReceiptCustomerSyncDataSourceInterface::class);
         $dataSource->shouldReceive('fetch')
             ->once()
             ->andReturn($snapshot);
 
         $service = new ReceiptCustomerSyncService(
-            $auditService,
             $dataSource,
             new ReceiptCustomerSyncLineFactory(),
             app('config')
@@ -112,59 +79,17 @@ class ReceiptCustomerSyncServiceTest extends TestCase
             (object) ['F350_ID_CO' => '001']
         );
 
-        $this->assertSame('synced', $result['status']);
+        $this->assertSame('prepared', $result['status']);
         $this->assertSame(12, $result['line_count']);
+        $this->assertCount(12, $result['lines']);
         $this->assertSame('receipt_customer', $result['parties'][0]['role']);
-        $this->assertSame(301, $result['parties'][0]['siesa_web_service']['id']);
+        $this->assertSame('prepared', $result['parties'][0]['status']);
+        $this->assertTrue(str_starts_with($result['lines'][0], '0200'));
+        $this->assertTrue(str_starts_with($result['lines'][1], '0201'));
+        $this->assertTrue(str_starts_with($result['lines'][10], '0207'));
     }
 
-    public function test_it_stops_the_receipt_when_customer_sync_import_fails(): void
-    {
-        config()->set('workerhub.receipts.customer_sync.enabled', true);
-
-        $snapshot = new ReceiptCustomerSyncSnapshot(
-            enterpriseOperationalCenter: '001',
-            thirdPartyId: '900123',
-            sourceBranch: '00',
-            customerClassId: '50',
-            allowsSelection: true,
-            canMigrate: true,
-            shouldSync: true,
-            skipReason: null,
-            thirdPartyPrototype: $this->thirdPartyPrototype(),
-            branchPrototype: $this->branchPrototype(),
-        );
-
-        $auditService = Mockery::mock(SiesaImportAuditService::class);
-        $auditService->shouldReceive('import')
-            ->once()
-            ->andReturn(new SiesaImportAuditResult(
-                new SiesaWebServiceLogRecord(302, '<Envelope />', ['customer_sync_role' => 'receipt_customer']),
-                new ImportResult(false, 'Fallo sync tercero', ['soap_error'], '<Envelope />')
-            ));
-
-        $dataSource = Mockery::mock(ReceiptCustomerSyncDataSourceInterface::class);
-        $dataSource->shouldReceive('fetch')
-            ->once()
-            ->andReturn($snapshot);
-
-        $service = new ReceiptCustomerSyncService(
-            $auditService,
-            $dataSource,
-            new ReceiptCustomerSyncLineFactory(),
-            app('config')
-        );
-
-        $this->expectException(WorkerTaskProcessingException::class);
-        $this->expectExceptionMessage('Fallo importando tercero/cliente previo al recibo (receipt_customer).');
-
-        $service->sync(
-            ['document_id' => '002-FC-24088'],
-            new stdClass()
-        );
-    }
-
-    public function test_it_syncs_the_other_income_third_party_when_receipt_header_references_a_different_party(): void
+    public function test_it_prepares_the_other_income_third_party_when_receipt_header_references_a_different_party(): void
     {
         config()->set('workerhub.receipts.customer_sync.enabled', true);
 
@@ -192,24 +117,6 @@ class ReceiptCustomerSyncServiceTest extends TestCase
             branchPrototype: $this->branchPrototype('12364578'),
         );
 
-        $auditService = Mockery::mock(SiesaImportAuditService::class);
-        $auditService->shouldReceive('import')
-            ->once()
-            ->with(
-                Mockery::type('array'),
-                Mockery::on(static function (array $context): bool {
-                    return $context['document_id'] === '002-FC-24089'
-                        && $context['import_stage'] === 'receipt_customer_sync'
-                        && $context['customer_sync_role'] === 'other_income_third_party'
-                        && $context['third_party_id'] === '12364578'
-                        && $context['source_branch'] === '00';
-                })
-            )
-            ->andReturn(new SiesaImportAuditResult(
-                new SiesaWebServiceLogRecord(303, '<Envelope />', ['customer_sync_role' => 'other_income_third_party']),
-                new ImportResult(true, 'Tercero auxiliar sincronizado', [], '<Envelope />')
-            ));
-
         $dataSource = Mockery::mock(ReceiptCustomerSyncDataSourceInterface::class);
         $dataSource->shouldReceive('fetch')
             ->once()
@@ -225,7 +132,6 @@ class ReceiptCustomerSyncServiceTest extends TestCase
             ->andReturn($dependentSnapshot);
 
         $service = new ReceiptCustomerSyncService(
-            $auditService,
             $dataSource,
             new ReceiptCustomerSyncLineFactory(),
             app('config')
@@ -241,13 +147,14 @@ class ReceiptCustomerSyncServiceTest extends TestCase
             ]
         );
 
-        $this->assertSame('synced', $result['status']);
+        $this->assertSame('prepared', $result['status']);
         $this->assertSame(12, $result['line_count']);
+        $this->assertCount(12, $result['lines']);
         $this->assertCount(2, $result['parties']);
         $this->assertSame('skipped', $result['parties'][0]['status']);
         $this->assertSame('other_income_third_party', $result['parties'][1]['role']);
+        $this->assertSame('prepared', $result['parties'][1]['status']);
         $this->assertSame('12364578', $result['parties'][1]['snapshot']['third_party_id']);
-        $this->assertSame(303, $result['parties'][1]['siesa_web_service']['id']);
     }
 
     /**

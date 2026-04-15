@@ -8,6 +8,7 @@ use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+
 class ReceiptMigrationService
 {
     public function __construct(
@@ -31,7 +32,8 @@ class ReceiptMigrationService
         $crossReference = $this->crossReferenceGuard->assertExists($payload, $header);
         $customerSync = $this->customerSyncService->sync($payload, $header);
         $payments = $this->repository->findPayments($payload);
-        $lines = $this->lineFactory->build($header, $payments);
+        $receiptLines = $this->lineFactory->build($header, $payments);
+        $lines = array_merge($customerSync['lines'] ?? [], $receiptLines);
         $audit = $this->auditService->import($lines, [
             'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
             'task_type' => $payload['_workerhub_task_type'] ?? 'receipt_migration',
@@ -39,7 +41,10 @@ class ReceiptMigrationService
             'source' => $payload['source'] ?? null,
             'import_stage' => 'receipt_migration',
             'line_count' => count($lines),
+            'receipt_line_count' => count($receiptLines),
+            'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
             'payment_count' => count($payments),
+            'customer_sync' => $customerSync,
         ]);
         $result = $audit->result;
 
@@ -63,6 +68,8 @@ class ReceiptMigrationService
             'siesa_web_service' => $audit->log->toArray(),
             'import_payload' => $result->payload,
             'line_count' => count($lines),
+            'receipt_line_count' => count($receiptLines),
+            'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
             'payment_count' => count($payments),
             'receipt_reference' => $this->buildReference($payload),
             'pre_migration' => $preMigrationSnapshot->toArray(),
