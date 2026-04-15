@@ -34,6 +34,19 @@ Se registra XML previo para:
 - `receipt_customer_sync`
 - `receipt_migration`
 
+## Documento de cruce en recibos
+
+`WorkerHub` valida por defecto que el documento de cruce del recibo exista en `SiesaEnterprise.dbo.t353_co_saldo_abierto`.
+
+Configuracion:
+
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_MODE=strict`
+  Bloquea el recibo antes del XML final si el cruce no existe.
+- `WORKERHUB_RECEIPT_CROSS_REFERENCE_MODE=warn`
+  Deja continuar la importacion, registra el XML final en `siesa_web_services` y permite ver el rechazo real del WS de Siesa.
+
+Para pruebas end-to-end en desarrollo donde todavia no existe el documento base en Siesa, el modo `warn` permite auditar el payload completo sin quitar la validacion en produccion.
+
 ## Uso operativo
 
 Esto permite:

@@ -143,6 +143,7 @@ return [
         ],
         'cross_reference' => [
             'enabled' => filter_var(env('WORKERHUB_RECEIPT_CROSS_REFERENCE_GUARD_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'mode' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_MODE', 'strict'),
             'auxiliary_id' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_AUXILIARY_ID', '28050505'),
             'unit' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_UNIT', '02'),
             'enterprise_tables' => [

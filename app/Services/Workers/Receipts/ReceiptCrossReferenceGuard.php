@@ -32,7 +32,7 @@ class ReceiptCrossReferenceGuard
 
         $snapshot = $this->dataSource->fetch($payload, $receiptHeader);
 
-        if (!$snapshot->exists) {
+        if (!$snapshot->exists && $this->shouldBlockOnMissingReference()) {
             throw new WorkerTaskProcessingException(
                 'El recibo referencia un documento de cruce inexistente en Siesa.',
                 [
@@ -48,5 +48,10 @@ class ReceiptCrossReferenceGuard
     private function isEnabled(): bool
     {
         return (bool) $this->config->get('workerhub.receipts.cross_reference.enabled', true);
+    }
+
+    private function shouldBlockOnMissingReference(): bool
+    {
+        return (string) $this->config->get('workerhub.receipts.cross_reference.mode', 'strict') !== 'warn';
     }
 }
