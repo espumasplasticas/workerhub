@@ -45,6 +45,13 @@ Configuracion:
 - `WORKERHUB_RECEIPT_CROSS_REFERENCE_MODE=warn`
   Deja continuar la importacion, registra el XML final en `siesa_web_services` y permite ver el rechazo real del WS de Siesa.
 
+Default versionado:
+
+- `APP_ENV=local|dev|development` => `warn`
+- cualquier otro ambiente => `strict`
+
+El valor explicito en `.env` o `.env.docker` sigue teniendo prioridad.
+
 Para pruebas end-to-end en desarrollo donde todavia no existe el documento base en Siesa, el modo `warn` permite auditar el payload completo sin quitar la validacion en produccion.
 
 ## Uso operativo
