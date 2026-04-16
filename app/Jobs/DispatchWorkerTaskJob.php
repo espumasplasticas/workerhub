@@ -118,7 +118,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
             return;
         }
 
-        if (!is_numeric(Arr::get($this->task, 'payload.created_by_intranet_user_id'))) {
+        if (!is_numeric(Arr::get($this->task, 'payload.created_by_user_id'))) {
             return;
         }
 
@@ -132,7 +132,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
                     'User notified in API after Siesa receipt migration.',
                     [
                         'document_id' => Arr::get($this->task, 'payload.document_id'),
-                        'created_by_intranet_user_id' => Arr::get($this->task, 'payload.created_by_intranet_user_id'),
+                        'created_by_user_id' => Arr::get($this->task, 'payload.created_by_user_id'),
                     ]
                 );
             }
@@ -144,7 +144,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
                     'API notification after receipt migration failed.',
                     [
                         'document_id' => Arr::get($this->task, 'payload.document_id'),
-                        'created_by_intranet_user_id' => Arr::get($this->task, 'payload.created_by_intranet_user_id'),
+                        'created_by_user_id' => Arr::get($this->task, 'payload.created_by_user_id'),
                         'error' => $exception->getMessage(),
                     ],
                     'warning'

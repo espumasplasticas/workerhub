@@ -11,9 +11,9 @@ class ReceiptMigrationNotificationClient
     public function notifyReceiptMigrated(array $task): void
     {
         $payload = Arr::get($task, 'payload', []);
-        $createdByIntranetUserId = Arr::get($payload, 'created_by_intranet_user_id');
+        $createdByUserId = Arr::get($payload, 'created_by_user_id');
 
-        if (!is_numeric($createdByIntranetUserId)) {
+        if (!is_numeric($createdByUserId)) {
             return;
         }
 
@@ -39,7 +39,7 @@ class ReceiptMigrationNotificationClient
                 'client_code' => Arr::get($payload, 'client_code'),
                 'client_branch' => Arr::get($payload, 'client_branch'),
                 'receipt_total' => Arr::get($payload, 'receipt_total'),
-                'created_by_intranet_user_id' => (int) $createdByIntranetUserId,
+                'created_by_user_id' => (int) $createdByUserId,
                 'completed_at' => now()->toIso8601String(),
                 'result' => Arr::get($task, 'result', []),
             ]);
