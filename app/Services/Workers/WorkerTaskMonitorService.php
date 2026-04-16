@@ -285,14 +285,12 @@ class WorkerTaskMonitorService
         array $context = [],
         string $level = 'info'
     ): void {
-        WorkerTask::query()->whereKey($taskId)->update($attributes);
+        $task = WorkerTask::query()->findOrFail($taskId);
+        $task->fill($attributes);
+        $task->save();
+
         $this->addEvent($taskId, $event, $message, $context, $level);
-
-        $task = WorkerTask::query()->find($taskId);
-
-        if ($task !== null) {
-            $this->broadcastUpdate($task, $event, $message, $context, $level);
-        }
+        $this->broadcastUpdate($task->fresh(), $event, $message, $context, $level);
     }
 
     public function markReplayed(string $taskId, string $newTaskId): void
