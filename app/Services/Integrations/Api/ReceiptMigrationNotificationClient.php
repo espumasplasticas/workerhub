@@ -60,6 +60,7 @@ class ReceiptMigrationNotificationClient
 
         $response = Http::timeout((int) config('services.api.timeout', 10))
             ->acceptJson()
+            ->asForm()
             ->withHeaders([
                 'X-WorkerHub-Notification-Token' => $token,
             ])
