@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Exceptions\WorkerTaskProcessingException;
 use App\Models\WorkerTask;
+use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
 use App\Services\Kafka\KafkaMessageProducer;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
@@ -12,6 +13,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Arr;
 use Throwable;
 
 class DispatchWorkerTaskJob implements ShouldQueue
@@ -33,7 +35,8 @@ class DispatchWorkerTaskJob implements ShouldQueue
     public function handle(
         WorkerTaskRouter $router,
         KafkaMessageProducer $producer,
-        WorkerTaskMonitorService $monitor
+        WorkerTaskMonitorService $monitor,
+        ReceiptMigrationNotificationClient $notificationClient
     ): void
     {
         $taskId = (string) ($this->task['task_id'] ?? '');
@@ -44,11 +47,14 @@ class DispatchWorkerTaskJob implements ShouldQueue
             }
 
             $result = $router->handle($this->task);
+            $this->task['result'] = $result;
             $documentId = $this->task['payload']['document_id'] ?? null;
 
             if ($taskId !== '') {
                 $monitor->markCompleted($taskId, $result);
             }
+
+            $this->notifyReceiptMigrationIfNeeded($notificationClient, $monitor, $taskId);
 
             $producer->publishResult([
                 'event' => 'worker_task.completed',
@@ -97,6 +103,54 @@ class DispatchWorkerTaskJob implements ShouldQueue
         $value = $this->task[$key] ?? null;
 
         return is_numeric($value) ? (int) $value : $default;
+    }
+
+    private function notifyReceiptMigrationIfNeeded(
+        ReceiptMigrationNotificationClient $notificationClient,
+        WorkerTaskMonitorService $monitor,
+        string $taskId
+    ): void {
+        if (($this->task['type'] ?? null) !== 'receipt_migration') {
+            return;
+        }
+
+        if (Arr::get($this->task, 'payload.source') !== 'api') {
+            return;
+        }
+
+        if (!is_numeric(Arr::get($this->task, 'payload.created_by_intranet_user_id'))) {
+            return;
+        }
+
+        try {
+            $notificationClient->notifyReceiptMigrated($this->task);
+
+            if ($taskId !== '') {
+                $monitor->addEvent(
+                    $taskId,
+                    'task.notification.receipt_migrated',
+                    'User notified in API after Siesa receipt migration.',
+                    [
+                        'document_id' => Arr::get($this->task, 'payload.document_id'),
+                        'created_by_intranet_user_id' => Arr::get($this->task, 'payload.created_by_intranet_user_id'),
+                    ]
+                );
+            }
+        } catch (Throwable $exception) {
+            if ($taskId !== '') {
+                $monitor->addEvent(
+                    $taskId,
+                    'task.notification.failed',
+                    'API notification after receipt migration failed.',
+                    [
+                        'document_id' => Arr::get($this->task, 'payload.document_id'),
+                        'created_by_intranet_user_id' => Arr::get($this->task, 'payload.created_by_intranet_user_id'),
+                        'error' => $exception->getMessage(),
+                    ],
+                    'warning'
+                );
+            }
+        }
     }
 
     private function reportFailure(
