@@ -30,7 +30,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
         $taskId = (string) ($this->task['task_id'] ?? '');
 
         try {
-            $monitor->markProcessing($taskId);
+            $monitor->markProcessing($taskId, $this->attempts());
 
             $result = $migrationService->execute(
                 (string) $this->task['type'],
@@ -75,14 +75,16 @@ class DispatchWorkerTaskJob implements ShouldQueue
             return;
         }
 
-        if (!is_numeric(Arr::get($this->task, 'payload.created_by_user_id'))) {
+        $createdByUserId = $this->resolveCreatedByUserId();
+
+        if (!is_numeric($createdByUserId)) {
             $monitor->addEvent(
                 $taskId,
                 'task.notification.skipped',
                 'API notification skipped because created_by_user_id is missing.',
                 [
                     'document_id' => Arr::get($this->task, 'payload.document_id'),
-                    'created_by_user_id' => Arr::get($this->task, 'payload.created_by_user_id'),
+                    'created_by_user_id' => $createdByUserId,
                 ],
                 'warning'
             );
@@ -99,7 +101,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
                     'User notified in API after Siesa receipt migration.',
                     [
                         'document_id' => Arr::get($this->task, 'payload.document_id'),
-                        'created_by_user_id' => Arr::get($this->task, 'payload.created_by_user_id'),
+                        'created_by_user_id' => (int) $createdByUserId,
                     ]
                 );
             }
@@ -111,13 +113,19 @@ class DispatchWorkerTaskJob implements ShouldQueue
                     'API notification after receipt migration failed.',
                     [
                         'document_id' => Arr::get($this->task, 'payload.document_id'),
-                        'created_by_user_id' => Arr::get($this->task, 'payload.created_by_user_id'),
+                        'created_by_user_id' => (int) $createdByUserId,
                         'error' => $exception->getMessage(),
                     ],
                     'warning'
                 );
             }
         }
+    }
+
+    private function resolveCreatedByUserId(): mixed
+    {
+        return Arr::get($this->task, 'payload.created_by_user_id')
+            ?? Arr::get($this->task, 'payload.metadata.created_by_user_id');
     }
 
     private function reportFailure(

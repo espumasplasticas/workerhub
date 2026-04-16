@@ -12,12 +12,14 @@ class ReceiptMigrationNotificationClient
     public function notifyReceiptMigrated(array $task): void
     {
         $payload = Arr::get($task, 'payload', []);
-        $createdByUserId = Arr::get($payload, 'created_by_user_id');
+        $createdByUserId = Arr::get($payload, 'created_by_user_id')
+            ?? Arr::get($payload, 'metadata.created_by_user_id');
 
         if (!is_numeric($createdByUserId)) {
             Log::warning('WorkerHub receipt notification skipped: missing created_by_user_id.', [
                 'task_id' => Arr::get($task, 'task_id'),
                 'document_id' => Arr::get($payload, 'document_id'),
+                'payload_keys' => array_keys($payload),
             ]);
             return;
         }
