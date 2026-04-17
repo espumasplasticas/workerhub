@@ -3,8 +3,8 @@
 namespace App\Jobs;
 
 use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
-use App\Services\Workers\DocumentMigrationService;
 use App\Services\Workers\WorkerTaskMonitorService;
+use App\Services\Workers\WorkerTaskRouter;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
@@ -23,7 +23,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
     }
 
     public function handle(
-        DocumentMigrationService $migrationService,
+        WorkerTaskRouter $taskRouter,
         WorkerTaskMonitorService $monitor,
         ReceiptMigrationNotificationClient $notificationClient
     ): void {
@@ -32,14 +32,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
         try {
             $monitor->markProcessing($taskId, $this->attempts());
 
-            $result = $migrationService->execute(
-                (string) $this->task['type'],
-                (array) $this->task['payload'],
-                [
-                    'task_id' => $taskId,
-                    'attempt' => $this->attempts(),
-                ]
-            );
+            $result = $taskRouter->handle($this->task);
 
             $this->task['result'] = $result;
             $monitor->markCompleted($taskId, $result);
