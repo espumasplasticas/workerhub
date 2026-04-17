@@ -10,9 +10,11 @@ use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
 use App\Services\Workers\Receipts\ReceiptCrossReferenceGuard;
 use App\Services\Workers\Receipts\ReceiptCustomerSyncService;
+use App\Services\Workers\Receipts\ReceiptLegacyStateService;
 use App\Services\Workers\Receipts\ReceiptLineFactory;
 use App\Services\Workers\Receipts\ReceiptPreMigrationGuard;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\Receipts\ReceiptSiesaStateService;
 use App\Services\Workers\SiesaImportAuditResult;
 use App\Services\Workers\SiesaImportAuditService;
 use Epsalibrary\Results\ImportResult;
@@ -125,6 +127,18 @@ class ReceiptMigrationServiceTest extends TestCase
             ));
 
         $lineFactory = new ReceiptLineFactory();
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->twice()
+            ->andReturn(
+                new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', false, '001', 'RX', '1001'),
+                new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', true, '001', 'RX', '1001', 100000.0, 0.0, 1)
+            );
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldReceive('markMigrationStarted')->once();
+        $legacyState->shouldReceive('markMigrated')->once();
+        $legacyState->shouldReceive('markDetectedInSiesa')->once();
 
         $auditService = Mockery::mock(SiesaImportAuditService::class);
         $auditService->shouldReceive('import')
@@ -160,7 +174,9 @@ class ReceiptMigrationServiceTest extends TestCase
             $repository,
             $crossReferenceGuard,
             $customerSync,
-            $lineFactory
+            $lineFactory,
+            $siesaStateService,
+            $legacyState
         );
 
         $result = $service->handle([
@@ -182,6 +198,7 @@ class ReceiptMigrationServiceTest extends TestCase
         $this->assertTrue($result['cross_reference']['exists']);
         $this->assertSame('prepared', $result['customer_sync']['status']);
         $this->assertSame(101, $result['siesa_web_service']['id']);
+        $this->assertTrue($result['siesa_state']['exists']);
     }
 
     public function test_it_surfaces_receipt_import_failures_with_context(): void
@@ -232,6 +249,14 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $lineFactory = Mockery::mock(ReceiptLineFactory::class);
         $lineFactory->shouldReceive('build')->once()->andReturn(['035700...', '035701...', '035702...']);
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', false, '001', 'RX', '1001'));
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldReceive('markMigrationStarted')->once();
+        $legacyState->shouldReceive('markMigrationFailed')->once();
 
         $auditService = Mockery::mock(SiesaImportAuditService::class);
         $auditService->shouldReceive('import')
@@ -248,11 +273,84 @@ class ReceiptMigrationServiceTest extends TestCase
             $repository,
             $crossReferenceGuard,
             $customerSync,
-            $lineFactory
+            $lineFactory,
+            $siesaStateService,
+            $legacyState
         );
 
         $this->expectException(WorkerTaskProcessingException::class);
         $this->expectExceptionMessage('Fallo importando recibo');
+
+        $service->handle([
+            'document_id' => '001-RX-1001',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'RX',
+            'document_number' => '1001',
+        ]);
+    }
+
+    public function test_it_stops_when_the_receipt_already_exists_in_siesa(): void
+    {
+        $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('findHeader')->once()->andReturn((object) [
+            'F350_ID_CO' => '001',
+            'F350_ID_TIPO_DOCTO' => 'RX',
+            'F350_CONSEC_DOCTO' => '1001',
+        ]);
+        $repository->shouldNotReceive('findPayments');
+
+        $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
+        $validator->shouldNotReceive('validate');
+
+        $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->andReturn(new ReceiptPreMigrationSnapshot(
+                operationalCenter: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                totalAmount: 100000,
+                legalizedAmount: 100000,
+                isCancelled: false,
+                isCancellationRequested: false,
+                isWompiExpiredWithoutPayment: false,
+            ));
+
+        $customerSync = Mockery::mock(ReceiptCustomerSyncService::class);
+        $customerSync->shouldNotReceive('sync');
+
+        $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
+        $crossReferenceGuard->shouldNotReceive('assertExists');
+
+        $lineFactory = Mockery::mock(ReceiptLineFactory::class);
+        $lineFactory->shouldNotReceive('build');
+
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', true, '001', 'RX', '1001', 100000.0, 0.0, 1));
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldReceive('markDetectedInSiesa')->once();
+
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldNotReceive('import');
+
+        $service = new ReceiptMigrationService(
+            $auditService,
+            $validator,
+            $guard,
+            $repository,
+            $crossReferenceGuard,
+            $customerSync,
+            $lineFactory,
+            $siesaStateService,
+            $legacyState
+        );
+
+        $this->expectException(WorkerTaskProcessingException::class);
+        $this->expectExceptionMessage('El recibo ya existe en Siesa y no debe retransmitirse.');
 
         $service->handle([
             'document_id' => '001-RX-1001',

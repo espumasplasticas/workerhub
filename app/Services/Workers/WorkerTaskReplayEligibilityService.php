@@ -1,0 +1,66 @@
+<?php
+
+namespace App\Services\Workers;
+
+use App\Models\WorkerTask;
+use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\Receipts\ReceiptSiesaStateService;
+use Throwable;
+
+class WorkerTaskReplayEligibilityService
+{
+    public function __construct(
+        private readonly ReceiptPrototypeRepository $receiptPrototypeRepository,
+        private readonly ReceiptSiesaStateService $receiptSiesaStateService
+    ) {
+    }
+
+    /**
+     * @return array{can_retry: bool, reason: ?string, siesa_state: array<string, mixed>|null}
+     */
+    public function inspect(WorkerTask $task): array
+    {
+        if (!in_array($task->status, ['failed', 'rejected'], true)) {
+            return [
+                'can_retry' => false,
+                'reason' => 'Solo se pueden reencolar tareas fallidas o rechazadas.',
+                'siesa_state' => null,
+            ];
+        }
+
+        if ($task->type !== 'receipt_migration') {
+            return [
+                'can_retry' => true,
+                'reason' => null,
+                'siesa_state' => null,
+            ];
+        }
+
+        $payload = is_array($task->payload) ? $task->payload : [];
+
+        try {
+            $header = $this->receiptPrototypeRepository->findHeader($payload);
+            $siesaState = $this->receiptSiesaStateService->fetch($payload, $header);
+
+            if ($siesaState->exists) {
+                return [
+                    'can_retry' => false,
+                    'reason' => 'El recibo ya existe en Siesa y no debe reencolarse.',
+                    'siesa_state' => $siesaState->toArray(),
+                ];
+            }
+
+            return [
+                'can_retry' => true,
+                'reason' => null,
+                'siesa_state' => $siesaState->toArray(),
+            ];
+        } catch (Throwable $exception) {
+            return [
+                'can_retry' => false,
+                'reason' => 'No se pudo validar si el recibo ya existe en Siesa: ' . $exception->getMessage(),
+                'siesa_state' => null,
+            ];
+        }
+    }
+}

@@ -151,6 +151,17 @@ return [
                 'auxiliaries' => env('WORKERHUB_RECEIPT_CROSS_REFERENCE_AUXILIARIES_TABLE', 'SiesaEnterprise.dbo.t253_co_auxiliares'),
             ],
         ],
+        'enterprise_state' => [
+            'tables' => [
+                'accounting_documents' => env('WORKERHUB_RECEIPT_ENTERPRISE_ACCOUNTING_DOCUMENTS_TABLE', 'SiesaEnterprise.dbo.t350_co_docto_contable'),
+                'cash_receipts' => env('WORKERHUB_RECEIPT_ENTERPRISE_CASH_RECEIPTS_TABLE', 'SiesaEnterprise.dbo.t357_co_ingresos_caja'),
+            ],
+        ],
+        'legacy_state' => [
+            'enabled' => filter_var(env('WORKERHUB_RECEIPT_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'table' => env('WORKERHUB_RECEIPT_LEGACY_STATE_TABLE', env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado')),
+            'service_user_id' => (int) env('WORKERHUB_RECEIPT_LEGACY_STATE_SERVICE_USER_ID', 285),
+        ],
     ],
 
     'processes' => [

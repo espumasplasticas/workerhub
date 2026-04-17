@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\WorkerTaskProcessingException;
 use App\Http\Controllers\Controller;
-use App\Support\WorkerTaskExecutionPlanResolver;
+use App\Services\Workers\Receipts\ReceiptLegacyStateService;
+use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\Receipts\ReceiptSiesaStateService;
 use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,7 +19,10 @@ class WorkerTaskController extends Controller
     public function __construct(
         private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
         private readonly WorkerTaskDispatchService $dispatcher,
-        private readonly WorkerTaskMonitorService $monitor
+        private readonly WorkerTaskMonitorService $monitor,
+        private readonly ReceiptPrototypeRepository $receiptPrototypeRepository,
+        private readonly ReceiptSiesaStateService $receiptSiesaStateService,
+        private readonly ReceiptLegacyStateService $receiptLegacyStateService
     )
     {
     }
@@ -34,6 +41,30 @@ class WorkerTaskController extends Controller
         $type = $validated['type'];
         $payload = $validated['payload'];
         $key = isset($payload['document_id']) ? (string) $payload['document_id'] : $taskId;
+
+        if ($type === 'receipt_migration') {
+            try {
+                $header = $this->receiptPrototypeRepository->findHeader($payload);
+                $siesaState = $this->receiptSiesaStateService->fetch($payload, $header);
+
+                if ($siesaState->exists) {
+                    $this->receiptLegacyStateService->markDetectedInSiesa($payload);
+
+                    return response()->json([
+                        'accepted' => false,
+                        'message' => 'El recibo ya existe en Siesa y no debe encolarse nuevamente.',
+                        'document_id' => $payload['document_id'] ?? null,
+                        'siesa_state' => $siesaState->toArray(),
+                    ], 409);
+                }
+            } catch (WorkerTaskProcessingException $exception) {
+                return response()->json([
+                    'accepted' => false,
+                    'message' => $exception->getMessage(),
+                    'context' => $exception->context(),
+                ], 422);
+            }
+        }
 
         $message = [
             'task_id' => $taskId,

@@ -1132,7 +1132,7 @@ function renderTasks() {
     nodes.body.innerHTML = state.tasks.map(task => `
         <tr data-task-id="${escapeHtml(task.id)}" class="${task.id === state.selectedTaskId ? 'is-selected' : ''}">
             <td class="task-id"><strong>${escapeHtml(task.id)}</strong><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
-            <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!['failed', 'rejected'].includes(task.status) ? 'disabled' : ''}></td>
+            <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!task.can_retry ? 'disabled' : ''}></td>
             <td><button class="detail-trigger" type="button" data-detail-task-id="${escapeHtml(task.id)}">Ver detalle</button></td>
             <td><span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span></td>
             <td><span class="${badgeClass('default')}">${escapeHtml(task.process_label || 'General')}</span></td>
@@ -1201,11 +1201,12 @@ function renderTaskDetail(task) {
     state.selectedTaskId = task.id;
     nodes.detailTitle.textContent = task.id;
     nodes.detailSubtitle.textContent = `${task.process_label || 'General'} - ${task.schedule_name || task.task_name || 'sin tarea programada'} - ${task.source || 'sin origen'}`;
-    nodes.retryButton.disabled = !['failed', 'rejected'].includes(task.status);
+    nodes.retryButton.disabled = !task.can_retry;
     nodes.openApiButton.disabled = false;
 
     const replays = Array.isArray(task.replays) ? task.replays.length : 0;
     const payload = task.payload || {};
+    const retryInspection = task.retry_inspection || null;
     const detailItems = [
         { label: 'Estado', value: `<span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span>`, className: 'inline-badge' },
         { label: 'Prioridad', value: `<span class="${badgeClass(task.priority)}">${escapeHtml(task.priority || 'default')}</span>`, className: 'inline-badge' },
@@ -1216,6 +1217,18 @@ function renderTaskDetail(task) {
         { label: 'Documento', value: escapeHtml(payload.document_id || '-'), className: 'code' },
         { label: 'Replay count', value: escapeHtml(replays) },
         { label: 'Parent task', value: escapeHtml(task.parent_task_id || '-'), className: 'code' },
+        ...(retryInspection ? [{
+            label: 'Siesa',
+            value: escapeHtml(`${retryInspection.accounting_operational_center || '-'}-${retryInspection.accounting_document_type || '-'}-${retryInspection.accounting_document_number || '-'}`),
+            className: 'code'
+        }] : []),
+        {
+            label: 'Reencolar',
+            value: task.can_retry
+                ? '<span class="badge completed">Disponible</span>'
+                : `<div class="collapsed-note">${escapeHtml(task.retry_block_reason || 'El replay esta bloqueado para esta tarea.')}</div>`,
+            className: task.can_retry ? 'inline-badge' : ''
+        },
         {
             label: 'Error',
             value: task.error_message

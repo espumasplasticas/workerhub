@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Jobs\DispatchWorkerTaskJob;
 use App\Services\Kafka\KafkaMessageProducer;
+use App\Services\Workers\Receipts\ReceiptLegacyStateService;
+use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\Receipts\ReceiptSiesaStateService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -61,5 +64,44 @@ class ReceiptMigrationControllerTest extends TestCase
         ]);
 
         Queue::assertPushed(DispatchWorkerTaskJob::class, 1);
+    }
+
+    public function test_it_rejects_enqueue_when_the_receipt_already_exists_in_siesa(): void
+    {
+        Queue::fake();
+
+        $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('findHeader')->once()->andReturn((object) [
+            'F350_ID_CO' => '001',
+            'F350_ID_TIPO_DOCTO' => 'RX',
+            'F350_CONSEC_DOCTO' => '1001',
+        ]);
+        $this->app->instance(ReceiptPrototypeRepository::class, $repository);
+
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', true, '001', 'RX', '1001'));
+        $this->app->instance(ReceiptSiesaStateService::class, $siesaStateService);
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldReceive('markDetectedInSiesa')->once();
+        $this->app->instance(ReceiptLegacyStateService::class, $legacyState);
+
+        $response = $this->postJson('/api/receipt-migrations', [
+            'document_id' => '001-RX-1001',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'RX',
+            'document_number' => '1001',
+            'source' => 'api',
+        ]);
+
+        $response->assertStatus(409)
+            ->assertJsonPath('accepted', false)
+            ->assertJsonPath('siesa_state.exists', true);
+
+        $this->assertDatabaseCount('worker_tasks', 0);
+        Queue::assertNothingPushed();
     }
 }

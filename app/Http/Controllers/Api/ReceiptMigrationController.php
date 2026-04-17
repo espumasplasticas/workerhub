@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Exceptions\WorkerTaskProcessingException;
 use App\Http\Controllers\Controller;
-use App\Support\WorkerTaskExecutionPlanResolver;
+use App\Services\Workers\Receipts\ReceiptLegacyStateService;
+use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
+use App\Services\Workers\Receipts\ReceiptSiesaStateService;
 use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Str;
@@ -15,7 +19,10 @@ class ReceiptMigrationController extends Controller
     public function __construct(
         private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
         private readonly WorkerTaskDispatchService $dispatcher,
-        private readonly WorkerTaskMonitorService $monitor
+        private readonly WorkerTaskMonitorService $monitor,
+        private readonly ReceiptPrototypeRepository $receiptPrototypeRepository,
+        private readonly ReceiptSiesaStateService $receiptSiesaStateService,
+        private readonly ReceiptLegacyStateService $receiptLegacyStateService
     ) {
     }
 
@@ -48,24 +55,48 @@ class ReceiptMigrationController extends Controller
             'task_name' => $validated['task_name'] ?? null,
         ], static fn ($value) => is_string($value) && trim($value) !== ''));
 
+        $payload = [
+            'receipt_id' => $validated['receipt_id'] ?? null,
+            'document_id' => $validated['document_id'],
+            'db_connection' => $validated['db_connection'],
+            'operational_center' => trim((string) $validated['operational_center']),
+            'document_type' => trim((string) $validated['document_type']),
+            'document_number' => trim((string) $validated['document_number']),
+            'company_id' => $validated['company_id'] ?? null,
+            'client_code' => $validated['client_code'] ?? null,
+            'source' => $validated['source'] ?? 'api',
+            'metadata' => $metadata,
+        ];
+
+        try {
+            $header = $this->receiptPrototypeRepository->findHeader($payload);
+            $siesaState = $this->receiptSiesaStateService->fetch($payload, $header);
+
+            if ($siesaState->exists) {
+                $this->receiptLegacyStateService->markDetectedInSiesa($payload);
+
+                return response()->json([
+                    'accepted' => false,
+                    'message' => 'El recibo ya existe en Siesa y no debe encolarse nuevamente.',
+                    'document_id' => $validated['document_id'],
+                    'siesa_state' => $siesaState->toArray(),
+                ], 409);
+            }
+        } catch (WorkerTaskProcessingException $exception) {
+            return response()->json([
+                'accepted' => false,
+                'message' => $exception->getMessage(),
+                'context' => $exception->context(),
+            ], 422);
+        }
+
         $taskId = (string) Str::uuid();
         $message = [
             'task_id' => $taskId,
             'type' => 'receipt_migration',
             'priority' => $validated['priority'] ?? 'default',
             'headers' => [],
-            'payload' => [
-                'receipt_id' => $validated['receipt_id'] ?? null,
-                'document_id' => $validated['document_id'],
-                'db_connection' => $validated['db_connection'],
-                'operational_center' => trim((string) $validated['operational_center']),
-                'document_type' => trim((string) $validated['document_type']),
-                'document_number' => trim((string) $validated['document_number']),
-                'company_id' => $validated['company_id'] ?? null,
-                'client_code' => $validated['client_code'] ?? null,
-                'source' => $validated['source'] ?? 'api',
-                'metadata' => $metadata,
-            ],
+            'payload' => $payload,
             'submitted_at' => now()->toIso8601String(),
         ];
         $executionPlan = $this->executionPlanResolver->resolve($message);

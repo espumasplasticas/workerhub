@@ -11,7 +11,8 @@ class WorkerTaskReplayService
 {
     public function __construct(
         private readonly WorkerTaskMonitorService $monitor,
-        private readonly WorkerTaskDispatchService $dispatcher
+        private readonly WorkerTaskDispatchService $dispatcher,
+        private readonly WorkerTaskReplayEligibilityService $eligibility
     ) {
     }
 
@@ -24,8 +25,10 @@ class WorkerTaskReplayService
     {
         $task = WorkerTask::query()->findOrFail($taskId);
 
-        if (!in_array($task->status, ['failed', 'rejected'], true)) {
-            throw new InvalidArgumentException('Solo se pueden reencolar tareas fallidas o rechazadas.');
+        $eligibility = $this->eligibility->inspect($task);
+
+        if (!$eligibility['can_retry']) {
+            throw new InvalidArgumentException((string) ($eligibility['reason'] ?? 'La tarea no se puede reencolar.'));
         }
 
         $headers = [];

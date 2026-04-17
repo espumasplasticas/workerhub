@@ -17,7 +17,8 @@ class WorkerTaskMonitorService
     public function __construct(
         private readonly WorkerTaskNotificationService $notifications,
         private readonly WorkerTaskProcessCatalog $processCatalog,
-        private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver
+        private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
+        private readonly WorkerTaskReplayEligibilityService $replayEligibility
     ) {
     }
 
@@ -198,12 +199,29 @@ class WorkerTaskMonitorService
      */
     public function findReplayableTaskIds(MonitorTaskFilters $filters, int $limit = 100): array
     {
-        return $this->queryTasks($filters)
+        $tasks = $this->queryTasks($filters)
             ->whereIn('status', ['failed', 'rejected'])
             ->latest('requested_at')
-            ->limit($limit)
-            ->pluck('id')
-            ->all();
+            ->limit(max($limit * 3, $limit))
+            ->get();
+
+        $taskIds = [];
+
+        foreach ($tasks as $task) {
+            $eligibility = $this->replayEligibility->inspect($task);
+
+            if (!$eligibility['can_retry']) {
+                continue;
+            }
+
+            $taskIds[] = $task->getKey();
+
+            if (count($taskIds) >= $limit) {
+                break;
+            }
+        }
+
+        return $taskIds;
     }
 
     /**
@@ -370,6 +388,8 @@ class WorkerTaskMonitorService
      */
     private function serializeTask(WorkerTask $task): array
     {
+        $eligibility = $this->replayEligibility->inspect($task);
+
         return [
             'id' => $task->id,
             'parent_task_id' => $task->parent_task_id,
@@ -396,6 +416,9 @@ class WorkerTaskMonitorService
             'payload' => $task->payload,
             'result' => $task->result,
             'metadata' => $task->metadata,
+            'can_retry' => $eligibility['can_retry'],
+            'retry_block_reason' => $eligibility['reason'],
+            'retry_inspection' => $eligibility['siesa_state'],
         ];
     }
 
