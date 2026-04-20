@@ -207,6 +207,7 @@ return [
         'enterprise_state' => [
             'tables' => [
                 'orders' => env('WORKERHUB_ORDER_ENTERPRISE_ORDERS_TABLE', 'SiesaEnterprise.dbo.t430_cm_pv_docto'),
+                'order_lines' => env('WORKERHUB_ORDER_ENTERPRISE_ORDER_LINES_TABLE', 'SiesaEnterprise.dbo.t431_cm_pv_movto'),
                 'items' => env('WORKERHUB_ORDER_ENTERPRISE_ITEMS_TABLE', 'SiesaEnterprise.dbo.t120_mc_items'),
             ],
         ],

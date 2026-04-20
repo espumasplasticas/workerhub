@@ -64,7 +64,8 @@ class OrderSiesaStateService
             enterpriseDocumentType: $row?->f430_id_tipo_docto !== null ? trim((string) $row->f430_id_tipo_docto) : null,
             enterpriseDocumentNumber: $row?->f430_consec_docto !== null ? trim((string) $row->f430_consec_docto) : null,
             rowId: $row?->f430_rowid !== null ? (int) $row->f430_rowid : null,
-            netTotal: $row?->f430_valor_neto !== null ? (float) $row->f430_valor_neto : null,
+            // Legacy verification reads the net amount from t431 detail rows, not from t430.
+            netTotal: $row?->f430_rowid !== null ? $this->findNetTotal($connection, (int) $row->f430_rowid) : null,
             stateIndicator: $row?->f430_ind_estado !== null ? (int) $row->f430_ind_estado : null,
         );
     }
@@ -78,7 +79,6 @@ class OrderSiesaStateService
                     RTRIM(f430_id_tipo_docto) AS f430_id_tipo_docto,
                     RTRIM(CONVERT(varchar(50), f430_consec_docto)) AS f430_consec_docto,
                     f430_rowid,
-                    f430_valor_neto,
                     f430_ind_estado
                 FROM %s
                 WHERE RTRIM(f430_id_co) = ?
@@ -88,6 +88,25 @@ class OrderSiesaStateService
             ),
             [$co, $type, $number]
         );
+    }
+
+    private function findNetTotal(ConnectionInterface $connection, int $rowId): ?float
+    {
+        $row = $connection->selectOne(
+            sprintf(
+                "SELECT SUM(f431_vlr_neto) AS net_total
+                FROM %s
+                WHERE f431_rowid_pv_docto = ?",
+                $this->enterpriseOrderLinesTable()
+            ),
+            [$rowId]
+        );
+
+        if (!$row instanceof stdClass || $row->net_total === null) {
+            return null;
+        }
+
+        return (float) $row->net_total;
     }
 
     /**
@@ -154,5 +173,10 @@ class OrderSiesaStateService
     private function enterpriseOrdersTable(): string
     {
         return (string) $this->config->get('workerhub.orders.enterprise_state.tables.orders', 'SiesaEnterprise.dbo.t430_cm_pv_docto');
+    }
+
+    private function enterpriseOrderLinesTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.order_lines', 'SiesaEnterprise.dbo.t431_cm_pv_movto');
     }
 }
