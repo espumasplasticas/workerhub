@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Services\Integrations\Api\OrderMigrationNotificationClient;
 use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
@@ -25,6 +26,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
     public function handle(
         WorkerTaskRouter $taskRouter,
         WorkerTaskMonitorService $monitor,
+        OrderMigrationNotificationClient $orderNotificationClient,
         ReceiptMigrationNotificationClient $notificationClient
     ): void {
         $taskId = (string) ($this->task['task_id'] ?? '');
@@ -36,6 +38,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
 
             $this->task['result'] = $result;
             $monitor->markCompleted($taskId, $result);
+            $this->notifyOrderMigrationIfNeeded($orderNotificationClient, $monitor, $taskId);
             $this->notifyReceiptMigrationIfNeeded($notificationClient, $monitor, $taskId);
         } catch (Throwable $exception) {
             $this->reportFailure($monitor, $taskId, $exception);
@@ -104,6 +107,66 @@ class DispatchWorkerTaskJob implements ShouldQueue
                     $taskId,
                     'task.notification.failed',
                     'API notification after receipt migration failed.',
+                    [
+                        'document_id' => Arr::get($this->task, 'payload.document_id'),
+                        'created_by_user_id' => (int) $createdByUserId,
+                        'error' => $exception->getMessage(),
+                    ],
+                    'warning'
+                );
+            }
+        }
+    }
+
+    private function notifyOrderMigrationIfNeeded(
+        OrderMigrationNotificationClient $notificationClient,
+        WorkerTaskMonitorService $monitor,
+        string $taskId
+    ): void {
+        if (($this->task['type'] ?? null) !== 'order_migration') {
+            return;
+        }
+
+        if (Arr::get($this->task, 'payload.source') !== 'api') {
+            return;
+        }
+
+        $createdByUserId = $this->resolveCreatedByUserId();
+
+        if (!is_numeric($createdByUserId)) {
+            $monitor->addEvent(
+                $taskId,
+                'task.notification.skipped',
+                'API notification skipped because created_by_user_id is missing.',
+                [
+                    'document_id' => Arr::get($this->task, 'payload.document_id'),
+                    'created_by_user_id' => $createdByUserId,
+                ],
+                'warning'
+            );
+            return;
+        }
+
+        try {
+            $notificationClient->notifyOrderMigrated($this->task);
+
+            if ($taskId !== '') {
+                $monitor->addEvent(
+                    $taskId,
+                    'task.notification.order_migrated',
+                    'User notified in API after Siesa order migration.',
+                    [
+                        'document_id' => Arr::get($this->task, 'payload.document_id'),
+                        'created_by_user_id' => (int) $createdByUserId,
+                    ]
+                );
+            }
+        } catch (Throwable $exception) {
+            if ($taskId !== '') {
+                $monitor->addEvent(
+                    $taskId,
+                    'task.notification.failed',
+                    'API notification after order migration failed.',
                     [
                         'document_id' => Arr::get($this->task, 'payload.document_id'),
                         'created_by_user_id' => (int) $createdByUserId,

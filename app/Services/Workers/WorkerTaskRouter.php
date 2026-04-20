@@ -11,6 +11,7 @@ class WorkerTaskRouter
     public function __construct(
         private readonly WorkerTaskExecutionPlanResolver $executionPlan,
         private readonly DocumentMigrationService $documentMigrationService,
+        private readonly OrderMigrationService $orderMigrationService,
         private readonly ReceiptMigrationService $receiptMigrationService
     ) {
     }
@@ -53,6 +54,7 @@ class WorkerTaskRouter
 
         return match ($type) {
             'document_migration' => $this->documentMigrationService->handle($payload),
+            'order_migration' => $this->orderMigrationService->handle($payload),
             'receipt_migration' => $this->receiptMigrationService->handle($payload),
             default => throw new InvalidArgumentException(sprintf('Tipo de tarea no soportado: %s', $type)),
         };

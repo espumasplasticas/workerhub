@@ -3,6 +3,8 @@
 namespace App\Services\Workers;
 
 use App\Models\WorkerTask;
+use App\Services\Workers\Orders\OrderPrototypeRepository;
+use App\Services\Workers\Orders\OrderSiesaStateService;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
 use App\Services\Workers\Receipts\ReceiptSiesaStateService;
 use Throwable;
@@ -10,6 +12,8 @@ use Throwable;
 class WorkerTaskReplayEligibilityService
 {
     public function __construct(
+        private readonly OrderPrototypeRepository $orderPrototypeRepository,
+        private readonly OrderSiesaStateService $orderSiesaStateService,
         private readonly ReceiptPrototypeRepository $receiptPrototypeRepository,
         private readonly ReceiptSiesaStateService $receiptSiesaStateService
     ) {
@@ -26,6 +30,35 @@ class WorkerTaskReplayEligibilityService
                 'reason' => 'Solo se pueden reencolar tareas fallidas o rechazadas.',
                 'siesa_state' => null,
             ];
+        }
+
+        if ($task->type === 'order_migration') {
+            $payload = is_array($task->payload) ? $task->payload : [];
+
+            try {
+                $header = $this->orderPrototypeRepository->findHeader($payload);
+                $siesaState = $this->orderSiesaStateService->fetch($payload, $header);
+
+                if ($siesaState->exists) {
+                    return [
+                        'can_retry' => false,
+                        'reason' => 'El pedido ya existe en Siesa y no debe reencolarse.',
+                        'siesa_state' => $siesaState->toArray(),
+                    ];
+                }
+
+                return [
+                    'can_retry' => true,
+                    'reason' => null,
+                    'siesa_state' => $siesaState->toArray(),
+                ];
+            } catch (Throwable $exception) {
+                return [
+                    'can_retry' => false,
+                    'reason' => 'No se pudo validar si el pedido ya existe en Siesa: ' . $exception->getMessage(),
+                    'siesa_state' => null,
+                ];
+            }
         }
 
         if ($task->type !== 'receipt_migration') {

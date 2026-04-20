@@ -30,6 +30,12 @@ return [
             'tries' => (int) env('WORKERHUB_RECEIPT_MIGRATION_TRIES', 3),
             'timeout' => (int) env('WORKERHUB_RECEIPT_MIGRATION_TIMEOUT', 300),
         ],
+        'order_migration' => [
+            'queue' => env('WORKERHUB_ORDER_MIGRATION_QUEUE', env('WORKERHUB_SALES_ORDERS_QUEUE', 'sales-orders-default')),
+            'high_priority_queue' => env('WORKERHUB_ORDER_MIGRATION_HIGH_QUEUE', env('WORKERHUB_SALES_ORDERS_HIGH_QUEUE', 'sales-orders-high')),
+            'tries' => (int) env('WORKERHUB_ORDER_MIGRATION_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_ORDER_MIGRATION_TIMEOUT', 300),
+        ],
     ],
 
     'kafka' => [
@@ -161,6 +167,53 @@ return [
             'enabled' => filter_var(env('WORKERHUB_RECEIPT_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
             'table' => env('WORKERHUB_RECEIPT_LEGACY_STATE_TABLE', env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado')),
             'service_user_id' => (int) env('WORKERHUB_RECEIPT_LEGACY_STATE_SERVICE_USER_ID', 285),
+        ],
+    ],
+
+    'orders' => [
+        'source_connections' => [
+            'sqlsrv' => env('WORKERHUB_ORDER_SOURCE_SQLSRV_CONNECTION', 'source_sqlsrv'),
+            'test' => env('WORKERHUB_ORDER_SOURCE_TEST_CONNECTION', 'source_test'),
+        ],
+        'views' => [
+            'header' => env('WORKERHUB_ORDER_HEADER_VIEW', 'prototipos.v_prototipo_pedidos_encabezado_sala_ventas'),
+            'detail' => env('WORKERHUB_ORDER_DETAIL_VIEW', 'prototipos.v_prototipo_pedidos_detalle_sala_ventas_sin_kit'),
+        ],
+        'detail' => [
+            'prepare_procedure' => env('WORKERHUB_ORDER_DETAIL_PREPARE_PROCEDURE', 'pos.usp_pedidos_detalle_items_con_kits'),
+            'price_list' => env('WORKERHUB_ORDER_DETAIL_PRICE_LIST', 'C37'),
+            'special_reference_warehouses' => [
+                'dispverde' => env('WORKERHUB_ORDER_DISPVERDE_WAREHOUSE', '00346'),
+            ],
+            'special_motives' => [
+                'fletenal' => env('WORKERHUB_ORDER_FLETENAL_MOTIVE', ''),
+                'serepcol' => env('WORKERHUB_ORDER_SEREPCOL_MOTIVE', ''),
+            ],
+        ],
+        'customer_sync' => [
+            'enabled' => filter_var(env('WORKERHUB_ORDER_CUSTOMER_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+        ],
+        'tables' => [
+            'orders' => env('WORKERHUB_ORDER_TABLE', 'pos.pedidos_encabezado'),
+            'order_details' => env('WORKERHUB_ORDER_DETAILS_TABLE', 'pos.pedidos_detalle'),
+            'history' => env('WORKERHUB_ORDER_HISTORY_TABLE', 'pos.pedidos_historia_migracion'),
+            'chain_third_parties' => env('WORKERHUB_ORDER_CHAIN_THIRD_PARTIES_TABLE', 'ventas.cadenas_tercero'),
+            'chain_orders' => env('WORKERHUB_ORDER_CHAIN_ORDERS_TABLE', 'ventas.pedidos_cadenas'),
+            'stores' => env('WORKERHUB_ORDER_STORES_TABLE', 'laravel_comodisimos.dbo.stores'),
+            'companies' => env('WORKERHUB_ORDER_COMPANIES_TABLE', 'laravel_comodisimos.dbo.companies'),
+            'item_units' => env('WORKERHUB_ORDER_ITEM_UNITS_TABLE', 'maestros_uno.cmitems_catalogo_de_items'),
+            'activation_periods' => env('WORKERHUB_ORDER_ACTIVATION_PERIODS_TABLE', 'contabilidad.er_salas_fechas_activacion'),
+        ],
+        'enterprise_state' => [
+            'tables' => [
+                'orders' => env('WORKERHUB_ORDER_ENTERPRISE_ORDERS_TABLE', 'SiesaEnterprise.dbo.t430_cm_pv_docto'),
+                'items' => env('WORKERHUB_ORDER_ENTERPRISE_ITEMS_TABLE', 'SiesaEnterprise.dbo.t120_mc_items'),
+            ],
+        ],
+        'legacy_state' => [
+            'enabled' => filter_var(env('WORKERHUB_ORDER_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'service_user_id' => (int) env('WORKERHUB_ORDER_LEGACY_STATE_SERVICE_USER_ID', 285),
+            'verification_threshold' => (float) env('WORKERHUB_ORDER_LEGACY_VERIFICATION_THRESHOLD', 1000),
         ],
     ],
 
