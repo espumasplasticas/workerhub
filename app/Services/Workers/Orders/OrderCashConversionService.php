@@ -32,6 +32,13 @@ WHERE t353.f353_id_cia = 1
   AND (t353.f353_total_db - t353.f353_total_cr <> 0)
   AND t253.f253_notas LIKE '%BALANCE%'
   AND t253.f253_id NOT IN ('28050558', '13050550')
+  AND EXISTS (
+      SELECT 1
+      FROM SiesaEnterprise.dbo.t201_mm_clientes AS t201
+      WHERE t201.f201_rowid_tercero = ?
+        AND t201.f201_id_sucursal = ?
+        AND t201.f201_id_cia = 1
+  )
 SQL;
 
     public function __construct(
@@ -110,26 +117,14 @@ SQL;
             return 0.0;
         }
 
-        $fastAmount = $this->fastSupportedPaymentAmount($connection, $thirdPartyId, $branchId);
-        if ($fastAmount > 0) {
-            return $fastAmount;
-        }
-
-        $rows = $connection->select(
-            sprintf('EXEC %s ?, ?', $this->supportedPaymentsProcedure()),
-            [$thirdPartyId, $branchId]
-        );
-
-        $total = 0.0;
-
-        foreach ($rows as $row) {
-            $total += (float) ($row->valor_saldo_cruzar ?? 0);
-        }
-
-        return $total;
+        return $this->supportedPaymentAmountEquivalentToLegacy($connection, $thirdPartyId, $branchId);
     }
 
-    private function fastSupportedPaymentAmount(ConnectionInterface $connection, string $thirdPartyId, string $branchId): float
+    /**
+     * Replica solo la primera agregacion del legacy (@total_pago).
+     * El detalle por medio de pago del SP no se usa en el worker y solo agrega latencia.
+     */
+    private function supportedPaymentAmountEquivalentToLegacy(ConnectionInterface $connection, string $thirdPartyId, string $branchId): float
     {
         if (!$this->shouldUseFastSupportedAmountQuery()) {
             return 0.0;
@@ -140,7 +135,12 @@ SQL;
             return 0.0;
         }
 
-        $row = $connection->selectOne(self::FAST_SUPPORTED_AMOUNT_SQL, [$thirdPartyRowId, $branchId]);
+        $row = $connection->selectOne(self::FAST_SUPPORTED_AMOUNT_SQL, [
+            $thirdPartyRowId,
+            $branchId,
+            $thirdPartyRowId,
+            $branchId,
+        ]);
 
         return (float) ($row->total_supported_amount ?? 0);
     }
@@ -176,11 +176,6 @@ SQL;
     private function cashRegisterTable(): string
     {
         return (string) $this->config->get('workerhub.orders.cash_conversion.cash_registers_table', 'SiesaEnterprise.dbo.t291_co_cajas');
-    }
-
-    private function supportedPaymentsProcedure(): string
-    {
-        return (string) $this->config->get('workerhub.orders.cash_conversion.supported_payments_procedure', 'ventas.usp_obtener_medidos_pago_del_valor_que_soporta_la_venta_V2');
     }
 
     private function shouldUseFastSupportedAmountQuery(): bool
