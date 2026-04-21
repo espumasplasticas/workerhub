@@ -9,6 +9,33 @@ use stdClass;
 
 class OrderCashConversionService
 {
+    private const FAST_SUPPORTED_AMOUNT_SQL = <<<'SQL'
+SELECT SUM(t350.f350_total_db) AS total_supported_amount
+FROM SiesaEnterprise.dbo.t353_co_saldo_abierto AS t353
+INNER JOIN SiesaEnterprise.dbo.t200_mm_terceros AS t200
+    ON t353.f353_rowid_tercero = t200.f200_rowid
+    AND t353.f353_id_cia = t200.f200_id_cia
+INNER JOIN SiesaEnterprise.dbo.t201_mm_clientes AS t201
+    ON t201.f201_rowid_tercero = t200.f200_rowid
+    AND t201.f201_id_sucursal = t353.f353_id_sucursal
+    AND t201.f201_id_cia = t353.f353_id_cia
+INNER JOIN SiesaEnterprise.dbo.t253_co_auxiliares AS t253
+    ON t353.f353_rowid_auxiliar = t253.f253_rowid
+    AND t353.f353_id_cia = t253.f253_id_cia
+INNER JOIN SiesaEnterprise.dbo.t285_co_centro_op AS t285
+    ON t353.f353_id_co_cruce = t285.f285_id
+    AND t353.f353_id_cia = t285.f285_id_cia
+INNER JOIN SiesaEnterprise.dbo.t350_co_docto_contable AS t350
+    ON t353.f353_rowid_docto = t350.f350_rowid
+    AND t353.f353_id_cia = t350.f350_id_cia
+WHERE t350.f350_ind_estado = 1
+  AND (t353.f353_total_db - t353.f353_total_cr <> 0)
+  AND t200.f200_id = ?
+  AND t201.f201_id_sucursal = ?
+  AND t253.f253_notas LIKE '%BALANCE%'
+  AND t253.f253_id NOT IN ('28050558', '13050550')
+SQL;
+
     public function __construct(
         private readonly DatabaseManager $database,
         private readonly Repository $config,
@@ -85,6 +112,11 @@ class OrderCashConversionService
             return 0.0;
         }
 
+        $fastAmount = $this->fastSupportedPaymentAmount($connection, $thirdPartyId, $branchId);
+        if ($fastAmount > 0) {
+            return $fastAmount;
+        }
+
         $rows = $connection->select(
             sprintf('EXEC %s ?, ?', $this->supportedPaymentsProcedure()),
             [$thirdPartyId, $branchId]
@@ -97,6 +129,17 @@ class OrderCashConversionService
         }
 
         return $total;
+    }
+
+    private function fastSupportedPaymentAmount(ConnectionInterface $connection, string $thirdPartyId, string $branchId): float
+    {
+        if (!$this->shouldUseFastSupportedAmountQuery()) {
+            return 0.0;
+        }
+
+        $row = $connection->selectOne(self::FAST_SUPPORTED_AMOUNT_SQL, [$thirdPartyId, $branchId]);
+
+        return (float) ($row->total_supported_amount ?? 0);
     }
 
     private function orderQuery(ConnectionInterface $connection, array $payload): \Illuminate\Database\Query\Builder
@@ -124,6 +167,11 @@ class OrderCashConversionService
     private function supportedPaymentsProcedure(): string
     {
         return (string) $this->config->get('workerhub.orders.cash_conversion.supported_payments_procedure', 'ventas.usp_obtener_medidos_pago_del_valor_que_soporta_la_venta_V2');
+    }
+
+    private function shouldUseFastSupportedAmountQuery(): bool
+    {
+        return (bool) $this->config->get('workerhub.orders.cash_conversion.fast_supported_amount_query', true);
     }
 
     private function ordersTable(): string
