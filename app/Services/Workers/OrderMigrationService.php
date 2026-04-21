@@ -27,7 +27,8 @@ class OrderMigrationService
 
     public function handle(array $payload): array
     {
-        $preMigrationSnapshot = $this->preMigrationGuard->assertCanMigrate($payload);
+        $orderRecord = $this->repository->findOrderRecord($payload);
+        $preMigrationSnapshot = $this->preMigrationGuard->assertCanMigrate($payload, $orderRecord);
         $header = $this->repository->findHeader($payload);
         $siesaStateBefore = $this->siesaStateService->fetch($payload, $header);
 
@@ -44,14 +45,14 @@ class OrderMigrationService
         }
 
         $this->soapConfigurationValidator->validate();
-        $this->legacyStateService->markMigrationStarted($payload);
-        $importSucceeded = false;
-        $legacyNetTotal = null;
+            $this->legacyStateService->markMigrationStarted($payload);
+            $importSucceeded = false;
+            $legacyNetTotal = null;
 
         try {
             $customerSync = $this->customerSyncService->sync($payload, $header);
             $details = $this->repository->findDetails($payload);
-            $orderLines = $this->lineFactory->build($payload, $header, $details);
+            $orderLines = $this->lineFactory->build($payload, $header, $orderRecord, $details);
             $lines = array_merge($customerSync['lines'] ?? [], $orderLines);
             $audit = $this->auditService->import($lines, [
                 'worker_task_id' => $payload['_workerhub_task_id'] ?? null,

@@ -39,9 +39,14 @@ class OrderMigrationServiceTest extends TestCase
             (object) ['PD_CodigoItem' => '1001', 'PD_Referencia' => 'REF-1'],
             (object) ['PD_CodigoItem' => '1002', 'PD_Referencia' => 'REF-2'],
         ];
+        $orderRecord = (object) [
+            'PE_OrdenDeCompra' => 'OC-24116',
+            'PE_OrdenDeCargue' => 'LOAD-24116',
+        ];
 
         $repository = Mockery::mock(OrderPrototypeRepository::class);
         $repository->shouldReceive('findHeader')->once()->andReturn($header);
+        $repository->shouldReceive('findOrderRecord')->once()->andReturn($orderRecord);
         $repository->shouldReceive('findDetails')->once()->andReturn($details);
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
@@ -50,6 +55,10 @@ class OrderMigrationServiceTest extends TestCase
         $guard = Mockery::mock(OrderPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
             ->once()
+            ->with(
+                Mockery::type('array'),
+                $orderRecord
+            )
             ->andReturn([
                 'client_code' => '900123',
                 'client_branch' => '001',
@@ -72,6 +81,12 @@ class OrderMigrationServiceTest extends TestCase
         $lineFactory = Mockery::mock(OrderLineFactory::class);
         $lineFactory->shouldReceive('build')
             ->once()
+            ->with(
+                Mockery::type('array'),
+                $header,
+                $orderRecord,
+                $details
+            )
             ->andReturn(['0430...', '0431...', '0432...']);
 
         $siesaStateService = Mockery::mock(OrderSiesaStateService::class);
@@ -144,16 +159,25 @@ class OrderMigrationServiceTest extends TestCase
             'f430_id_tipo_docto' => 'PFC',
             'f430_consec_docto' => '24116',
         ]);
+        $repository->shouldReceive('findOrderRecord')->once()->andReturn((object) [
+            'PE_OrdenDeCompra' => 'OC-24116',
+        ]);
         $repository->shouldNotReceive('findDetails');
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldNotReceive('validate');
 
         $guard = Mockery::mock(OrderPreMigrationGuard::class);
-        $guard->shouldReceive('assertCanMigrate')->once()->andReturn([
-            'client_code' => '900123',
-            'printed' => true,
-        ]);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->with(
+                Mockery::type('array'),
+                Mockery::type(stdClass::class)
+            )
+            ->andReturn([
+                'client_code' => '900123',
+                'printed' => true,
+            ]);
 
         $customerSync = Mockery::mock(OrderCustomerSyncService::class);
         $customerSync->shouldNotReceive('sync');

@@ -14,9 +14,9 @@ class OrderPreMigrationGuard
     /**
      * @return array<string, scalar|bool|null>
      */
-    public function assertCanMigrate(array $payload): array
+    public function assertCanMigrate(array $payload, ?stdClass $order = null): array
     {
-        $order = $this->repository->findOrderRecord($payload);
+        $order ??= $this->repository->findOrderRecord($payload);
 
         $clientCode = trim((string) ($order->PE_CodigoTercero ?? ''));
         $clientBranch = trim((string) ($order->PE_CodigoSucursal ?? ''));

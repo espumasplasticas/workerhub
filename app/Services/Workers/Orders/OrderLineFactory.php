@@ -25,10 +25,10 @@ class OrderLineFactory
      * @param list<stdClass> $detailRows
      * @return list<string>
      */
-    public function build(array $payload, stdClass $header, array $detailRows): array
+    public function build(array $payload, stdClass $header, stdClass $orderRecord, array $detailRows): array
     {
         $connection = $this->connectionFor((string) ($payload['db_connection'] ?? ''));
-        $mutatedHeader = $this->mutateHeader($connection, $payload, $header);
+        $mutatedHeader = $this->mutateHeader($connection, $header, $orderRecord);
         $headerConnector = $this->hydrate(new PrototipoPedidoEncabezado(), $mutatedHeader);
 
         $lines = [
@@ -63,12 +63,9 @@ class OrderLineFactory
         return $lines;
     }
 
-    private function mutateHeader(ConnectionInterface $connection, array $payload, stdClass $header): stdClass
+    private function mutateHeader(ConnectionInterface $connection, stdClass $header, stdClass $orderRecord): stdClass
     {
         $header = clone $header;
-        $header->f430_num_docto_referencia = trim((string) ($header->f430_num_docto_referencia ?? $payload['purchase_order'] ?? ''));
-        $header->f430_referencia = trim((string) ($header->f430_referencia ?? $payload['load_order'] ?? ''));
-        $orderRecord = $this->loadOrderReferenceRecord($connection, $header);
         $resolvedReferences = $this->headerReferenceResolver->resolve($header, $orderRecord);
 
         $header->f430_num_docto_referencia = $resolvedReferences['reference_document_number'];
@@ -109,37 +106,6 @@ class OrderLineFactory
         }
 
         return $header;
-    }
-
-    private function loadOrderReferenceRecord(ConnectionInterface $connection, stdClass $header): ?stdClass
-    {
-        $existingReferenceDocumentNumber = trim((string) ($header->f430_num_docto_referencia ?? ''));
-        $existingReference = trim((string) ($header->f430_referencia ?? ''));
-        $purchaseOrder = trim((string) ($header->PE_OrdenDeCompra ?? ''));
-        $loadOrder = trim((string) ($header->PE_OrdenDeCargue ?? ''));
-
-        if ($existingReferenceDocumentNumber !== '' && $existingReference !== '') {
-            return null;
-        }
-
-        if ($purchaseOrder !== '' && $loadOrder !== '') {
-            return null;
-        }
-
-        $operationalCenter = trim((string) ($header->PE_CentroOperativo ?? ''));
-        $documentType = trim((string) ($header->PE_TipoDocumento ?? ''));
-        $documentNumber = trim((string) ($header->PE_NumeroDocumento ?? ''));
-
-        if ($operationalCenter === '' || $documentType === '' || $documentNumber === '') {
-            return null;
-        }
-
-        return $connection->table($this->ordersTable())
-            ->select(['PE_OrdenDeCompra', 'PE_OrdenDeCargue'])
-            ->where('PE_CentroOperativo', $operationalCenter)
-            ->where('PE_TipoDocumento', $documentType)
-            ->where('PE_NumeroDocumento', $documentNumber)
-            ->first();
     }
 
     private function mutateDetail(ConnectionInterface $connection, stdClass $header, stdClass $detailRow): stdClass
@@ -463,10 +429,5 @@ class OrderLineFactory
     private function companiesTable(): string
     {
         return (string) $this->config->get('workerhub.orders.tables.companies', 'laravel_comodisimos.dbo.companies');
-    }
-
-    private function ordersTable(): string
-    {
-        return (string) $this->config->get('workerhub.orders.tables.orders', 'pos.pedidos_encabezado');
     }
 }
