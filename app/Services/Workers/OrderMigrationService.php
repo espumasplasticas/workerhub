@@ -103,6 +103,32 @@ class OrderMigrationService
             $result = $audit->result;
 
             if (!$result->success) {
+                $siesaStateAfterFailedImport = $measure('fetch_siesa_state_after_failed_import', fn () => $this->siesaStateService->fetch($payload, $header));
+
+                if ($siesaStateAfterFailedImport->exists) {
+                    $measure('mark_detected_in_siesa_after_failed_import', fn () => $this->legacyStateService->markDetectedInSiesa($payload, $siesaStateAfterFailedImport));
+
+                    return [
+                        'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+                        'source' => $payload['source'] ?? null,
+                        'message' => 'Siesa reporto error, pero el pedido quedo registrado. Se sincronizaron indicadores legacy y se omite el retry.',
+                        'errors' => $result->errors,
+                        'siesa_web_service' => $audit->log->toArray(),
+                        'import_payload' => $result->payload,
+                        'line_count' => count($lines),
+                        'order_line_count' => count($orderLines),
+                        'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
+                        'detail_count' => count($details),
+                        'order_reference' => $this->buildReference($payload),
+                        'pre_migration' => $preMigrationSnapshot,
+                        'customer_sync' => $customerSync,
+                        'siesa_state' => $siesaStateAfterFailedImport->toArray(),
+                        'legacy_net_total' => null,
+                        'already_migrated' => true,
+                        'timings_ms' => $timings,
+                    ];
+                }
+
                 throw new WorkerTaskProcessingException(
                     $result->message,
                     [

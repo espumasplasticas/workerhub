@@ -228,4 +228,117 @@ class OrderMigrationServiceTest extends TestCase
         $this->assertSame(0, $result['line_count']);
         $this->assertTrue($result['siesa_state']['exists']);
     }
+
+    public function test_it_resolves_failed_import_without_retry_when_order_exists_in_siesa_after_error(): void
+    {
+        $header = (object) [
+            'PE_CentroOperativo' => '002',
+            'PE_TipoDocumento' => 'FC',
+            'PE_NumeroDocumento' => '24116',
+            'PE_IndicadorObsequio' => 0,
+            'f430_id_co' => '002',
+            'f430_id_tipo_docto' => 'PFC',
+            'f430_consec_docto' => '24116',
+        ];
+
+        $details = [
+            (object) ['PD_CodigoItem' => '1001', 'PD_Referencia' => 'REF-1'],
+        ];
+        $orderRecord = (object) [
+            'PE_OrdenDeCompra' => 'OC-24116',
+            'PE_OrdenDeCargue' => 'LOAD-24116',
+        ];
+
+        $repository = Mockery::mock(OrderPrototypeRepository::class);
+        $repository->shouldReceive('findHeader')->once()->andReturn($header);
+        $repository->shouldReceive('findOrderRecord')->once()->andReturn($orderRecord);
+        $repository->shouldReceive('findDetails')->once()->andReturn($details);
+
+        $cashConversion = Mockery::mock(OrderCashConversionService::class);
+        $cashConversion->shouldReceive('normalizeIfSupported')->once()->andReturn(false);
+
+        $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
+        $validator->shouldReceive('validate')->once();
+
+        $guard = Mockery::mock(OrderPreMigrationGuard::class);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->with(Mockery::type('array'), $orderRecord)
+            ->andReturn([
+                'client_code' => '900123',
+                'client_branch' => '001',
+                'printed' => true,
+                'customer_class' => '01',
+                'is_cancelled' => false,
+                'is_manual_request' => false,
+                'is_gift' => false,
+            ]);
+
+        $customerSync = Mockery::mock(OrderCustomerSyncService::class);
+        $customerSync->shouldReceive('sync')
+            ->once()
+            ->andReturn([
+                'status' => 'skipped',
+                'line_count' => 0,
+                'lines' => [],
+            ]);
+
+        $lineFactory = Mockery::mock(OrderLineFactory::class);
+        $lineFactory->shouldReceive('build')
+            ->once()
+            ->with(Mockery::type('array'), $header, $orderRecord, $details)
+            ->andReturn(['0430...']);
+
+        $siesaStateService = Mockery::mock(OrderSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->twice()
+            ->andReturn(
+                new OrderSiesaStateSnapshot('002', 'FC', '24116', false),
+                new OrderSiesaStateSnapshot('002', 'FC', '24116', true, '002', 'PFC', '24116', 99, 120000.0, 1)
+            );
+
+        $legacyState = Mockery::mock(OrderLegacyStateService::class);
+        $legacyState->shouldReceive('markMigrationStarted')->once();
+        $legacyState->shouldReceive('markDetectedInSiesa')->once();
+        $legacyState->shouldNotReceive('markMigrated');
+        $legacyState->shouldNotReceive('markMigrationFailed');
+
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldReceive('import')
+            ->once()
+            ->andReturn(new SiesaImportAuditResult(
+                new SiesaWebServiceLogRecord(44, '<Envelope />', ['import_stage' => 'order_migration']),
+                new ImportResult(false, 'Error de Siesa', [
+                    ['detalle' => 'Documento inconsistente'],
+                ], '<Envelope />')
+            ));
+
+        $service = new OrderMigrationService(
+            $auditService,
+            $validator,
+            $guard,
+            $repository,
+            $cashConversion,
+            $customerSync,
+            $lineFactory,
+            $siesaStateService,
+            $legacyState
+        );
+
+        $result = $service->handle([
+            'document_id' => '002-FC-24116',
+            'source' => 'api',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '002',
+            'document_type' => 'FC',
+            'document_number' => '24116',
+        ]);
+
+        $this->assertTrue($result['already_migrated']);
+        $this->assertSame('002-FC-24116', $result['document_id']);
+        $this->assertSame('api', $result['source']);
+        $this->assertSame('Siesa reporto error, pero el pedido quedo registrado. Se sincronizaron indicadores legacy y se omite el retry.', $result['message']);
+        $this->assertSame(1, $result['order_line_count']);
+        $this->assertTrue($result['siesa_state']['exists']);
+    }
 }
