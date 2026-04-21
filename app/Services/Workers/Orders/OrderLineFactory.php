@@ -28,7 +28,7 @@ class OrderLineFactory
     public function build(array $payload, stdClass $header, array $detailRows): array
     {
         $connection = $this->connectionFor((string) ($payload['db_connection'] ?? ''));
-        $mutatedHeader = $this->mutateHeader($connection, $header);
+        $mutatedHeader = $this->mutateHeader($connection, $payload, $header);
         $headerConnector = $this->hydrate(new PrototipoPedidoEncabezado(), $mutatedHeader);
 
         $lines = [
@@ -63,9 +63,11 @@ class OrderLineFactory
         return $lines;
     }
 
-    private function mutateHeader(ConnectionInterface $connection, stdClass $header): stdClass
+    private function mutateHeader(ConnectionInterface $connection, array $payload, stdClass $header): stdClass
     {
         $header = clone $header;
+        $header->f430_num_docto_referencia = trim((string) ($header->f430_num_docto_referencia ?? $payload['purchase_order'] ?? ''));
+        $header->f430_referencia = trim((string) ($header->f430_referencia ?? $payload['load_order'] ?? ''));
         $orderRecord = $this->loadOrderReferenceRecord($connection, $header);
         $resolvedReferences = $this->headerReferenceResolver->resolve($header, $orderRecord);
 
