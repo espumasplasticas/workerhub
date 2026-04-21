@@ -42,13 +42,29 @@ class OrderMigrationService
         if ($siesaStateBefore->exists) {
             $this->legacyStateService->markDetectedInSiesa($payload, $siesaStateBefore);
 
-            throw new WorkerTaskProcessingException(
-                'El pedido ya existe en Siesa y no debe retransmitirse.',
-                [
-                    'payload' => $payload,
-                    'siesa_state' => $siesaStateBefore->toArray(),
-                ]
-            );
+            return [
+                'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+                'source' => $payload['source'] ?? null,
+                'message' => 'El pedido ya existe en Siesa. Se sincronizaron indicadores legacy y se omite la retransmision.',
+                'errors' => [],
+                'siesa_web_service' => null,
+                'import_payload' => null,
+                'line_count' => 0,
+                'order_line_count' => 0,
+                'customer_sync_line_count' => 0,
+                'detail_count' => 0,
+                'order_reference' => $this->buildReference($payload),
+                'pre_migration' => $preMigrationSnapshot,
+                'customer_sync' => [
+                    'status' => 'skipped',
+                    'line_count' => 0,
+                    'lines' => [],
+                    'reason' => 'order_already_exists_in_siesa',
+                ],
+                'siesa_state' => $siesaStateBefore->toArray(),
+                'legacy_net_total' => null,
+                'already_migrated' => true,
+            ];
         }
 
         $this->soapConfigurationValidator->validate();

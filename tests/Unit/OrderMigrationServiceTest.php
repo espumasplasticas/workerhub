@@ -5,7 +5,6 @@ namespace Tests\Unit;
 use App\Data\Orders\OrderSiesaStateSnapshot;
 use App\Data\Receipts\ReceiptCustomerSyncSnapshot;
 use App\Data\SiesaWebServiceLogRecord;
-use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\OrderMigrationService;
 use App\Services\Workers\Orders\OrderCashConversionService;
@@ -156,7 +155,7 @@ class OrderMigrationServiceTest extends TestCase
         $this->assertTrue($result['siesa_state']['exists']);
     }
 
-    public function test_it_stops_when_the_order_already_exists_in_siesa(): void
+    public function test_it_returns_a_resolved_result_when_the_order_already_exists_in_siesa(): void
     {
         $repository = Mockery::mock(OrderPrototypeRepository::class);
         $repository->shouldReceive('findHeader')->once()->andReturn((object) [
@@ -216,15 +215,17 @@ class OrderMigrationServiceTest extends TestCase
             $legacyState
         );
 
-        $this->expectException(WorkerTaskProcessingException::class);
-        $this->expectExceptionMessage('El pedido ya existe en Siesa y no debe retransmitirse.');
-
-        $service->handle([
+        $result = $service->handle([
             'document_id' => '002-FC-24116',
             'db_connection' => 'sqlsrv',
             'operational_center' => '002',
             'document_type' => 'FC',
             'document_number' => '24116',
         ]);
+
+        $this->assertTrue($result['already_migrated']);
+        $this->assertSame('002-FC-24116', $result['document_id']);
+        $this->assertSame(0, $result['line_count']);
+        $this->assertTrue($result['siesa_state']['exists']);
     }
 }
