@@ -16,7 +16,8 @@ class OrderLineFactory
 {
     public function __construct(
         private readonly DatabaseManager $database,
-        private readonly Repository $config
+        private readonly Repository $config,
+        private readonly OrderHeaderReferenceResolver $headerReferenceResolver
     ) {
     }
 
@@ -65,6 +66,11 @@ class OrderLineFactory
     private function mutateHeader(ConnectionInterface $connection, stdClass $header): stdClass
     {
         $header = clone $header;
+        $orderRecord = $this->loadOrderReferenceRecord($connection, $header);
+        $resolvedReferences = $this->headerReferenceResolver->resolve($header, $orderRecord);
+
+        $header->f430_num_docto_referencia = $resolvedReferences['reference_document_number'];
+        $header->f430_referencia = $resolvedReferences['reference'];
         $header->order_source_branch = trim((string) ($header->PE_CodigoSucursal ?? $header->f430_id_sucursal_fact ?? ''));
         $documentType = trim((string) ($header->PE_TipoDocumento ?? ''));
 
@@ -101,6 +107,37 @@ class OrderLineFactory
         }
 
         return $header;
+    }
+
+    private function loadOrderReferenceRecord(ConnectionInterface $connection, stdClass $header): ?stdClass
+    {
+        $existingReferenceDocumentNumber = trim((string) ($header->f430_num_docto_referencia ?? ''));
+        $existingReference = trim((string) ($header->f430_referencia ?? ''));
+        $purchaseOrder = trim((string) ($header->PE_OrdenDeCompra ?? ''));
+        $loadOrder = trim((string) ($header->PE_OrdenDeCargue ?? ''));
+
+        if ($existingReferenceDocumentNumber !== '' && $existingReference !== '') {
+            return null;
+        }
+
+        if ($purchaseOrder !== '' && $loadOrder !== '') {
+            return null;
+        }
+
+        $operationalCenter = trim((string) ($header->PE_CentroOperativo ?? ''));
+        $documentType = trim((string) ($header->PE_TipoDocumento ?? ''));
+        $documentNumber = trim((string) ($header->PE_NumeroDocumento ?? ''));
+
+        if ($operationalCenter === '' || $documentType === '' || $documentNumber === '') {
+            return null;
+        }
+
+        return $connection->table($this->ordersTable())
+            ->select(['PE_OrdenDeCompra', 'PE_OrdenDeCargue'])
+            ->where('PE_CentroOperativo', $operationalCenter)
+            ->where('PE_TipoDocumento', $documentType)
+            ->where('PE_NumeroDocumento', $documentNumber)
+            ->first();
     }
 
     private function mutateDetail(ConnectionInterface $connection, stdClass $header, stdClass $detailRow): stdClass
@@ -424,5 +461,10 @@ class OrderLineFactory
     private function companiesTable(): string
     {
         return (string) $this->config->get('workerhub.orders.tables.companies', 'laravel_comodisimos.dbo.companies');
+    }
+
+    private function ordersTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.tables.orders', 'pos.pedidos_encabezado');
     }
 }
