@@ -166,6 +166,7 @@ return [
         'legacy_state' => [
             'enabled' => filter_var(env('WORKERHUB_RECEIPT_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
             'table' => env('WORKERHUB_RECEIPT_LEGACY_STATE_TABLE', env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado')),
+            'history_table' => env('WORKERHUB_RECEIPT_LEGACY_STATE_HISTORY_TABLE', 'pos.recibos_historia_migracion'),
             'service_user_id' => (int) env('WORKERHUB_RECEIPT_LEGACY_STATE_SERVICE_USER_ID', 285),
         ],
     ],

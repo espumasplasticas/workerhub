@@ -22,6 +22,14 @@ class ReceiptLegacyStateService
             return;
         }
 
+        $this->upsertHistory($payload, [
+            'RH_IndicadorVerificado' => 0,
+            'RH_FechaVerificado' => null,
+            'RH_IdUsuarioVerifico' => null,
+            'RH_IndicadorPedidoEstaMigrado' => 0,
+            'RH_ConsecutivoDeMigracion' => 0,
+        ]);
+
         $this->receiptQuery($payload)->update([
             'RE_IndicadorMigrado' => 1,
         ]);
@@ -52,6 +60,14 @@ class ReceiptLegacyStateService
             'RE_CodigoUsuarioMigro' => $this->serviceUserId(),
             'RE_EstadoVerificadoExportacion' => 1,
         ]);
+
+        $this->upsertHistory($payload, [
+            'RH_IndicadorVerificado' => 0,
+            'RH_FechaVerificado' => null,
+            'RH_IdUsuarioVerifico' => null,
+            'RH_IndicadorPedidoEstaMigrado' => 0,
+            'RH_ConsecutivoDeMigracion' => 0,
+        ]);
     }
 
     public function markDetectedInSiesa(array $payload): void
@@ -70,6 +86,36 @@ class ReceiptLegacyStateService
             'RE_EstadoVerificadoExportacion' => 2,
             'RE_FechaVerificacionExportacion' => $timestamp,
         ]);
+
+        $this->upsertHistory($payload, [
+            'RH_IndicadorVerificado' => 1,
+            'RH_FechaVerificado' => $timestamp,
+            'RH_IdUsuarioVerifico' => $this->serviceUserId(),
+            'RH_IndicadorPedidoEstaMigrado' => 1,
+            'RH_ConsecutivoDeMigracion' => 0,
+        ]);
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    private function upsertHistory(array $payload, array $attributes): void
+    {
+        $reference = $this->resolveReference($payload);
+        $timestamp = Carbon::now();
+
+        $defaults = array_merge([
+            'RH_IdUsuario' => $this->serviceUserId(),
+            'RH_Fecha' => $timestamp,
+        ], $attributes);
+
+        $this->connectionFor($reference['db_connection'])
+            ->table($this->historyTable())
+            ->updateOrInsert([
+                'RH_CentroOperativo' => $reference['operational_center'],
+                'RH_TipoDocumento' => $reference['document_type'],
+                'RH_Numero' => $reference['document_number'],
+            ], $defaults);
     }
 
     private function receiptQuery(array $payload): \Illuminate\Database\Query\Builder
@@ -147,6 +193,11 @@ class ReceiptLegacyStateService
     private function table(): string
     {
         return (string) $this->config->get('workerhub.receipts.legacy_state.table', 'pos.recibos_encabezado');
+    }
+
+    private function historyTable(): string
+    {
+        return (string) $this->config->get('workerhub.receipts.legacy_state.history_table', 'pos.recibos_historia_migracion');
     }
 
     private function serviceUserId(): int

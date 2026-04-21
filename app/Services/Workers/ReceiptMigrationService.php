@@ -29,33 +29,59 @@ class ReceiptMigrationService
 
     public function handle(array $payload): array
     {
-        $preMigrationSnapshot = $this->preMigrationGuard->assertCanMigrate($payload);
-        $header = $this->repository->findHeader($payload);
-        $siesaStateBefore = $this->siesaStateService->fetch($payload, $header);
+        $timings = [];
+        $measure = static function (string $name, callable $callback) use (&$timings) {
+            $startedAt = microtime(true);
+            $result = $callback();
+            $timings[$name] = round((microtime(true) - $startedAt) * 1000, 2);
+
+            return $result;
+        };
+
+        $preMigrationSnapshot = $measure('pre_migration_guard', fn () => $this->preMigrationGuard->assertCanMigrate($payload));
+        $header = $measure('find_header', fn () => $this->repository->findHeader($payload));
+        $siesaStateBefore = $measure('fetch_siesa_state_before', fn () => $this->siesaStateService->fetch($payload, $header));
 
         if ($siesaStateBefore->exists) {
-            $this->legacyStateService->markDetectedInSiesa($payload);
+            $measure('mark_detected_in_siesa', fn () => $this->legacyStateService->markDetectedInSiesa($payload));
 
-            throw new WorkerTaskProcessingException(
-                'El recibo ya existe en Siesa y no debe retransmitirse.',
-                [
-                    'payload' => $payload,
-                    'siesa_state' => $siesaStateBefore->toArray(),
-                ]
-            );
+            return [
+                'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+                'source' => $payload['source'] ?? null,
+                'message' => 'El recibo ya existe en Siesa. Se sincronizaron indicadores legacy y se omite la retransmision.',
+                'errors' => [],
+                'siesa_web_service' => null,
+                'import_payload' => null,
+                'line_count' => 0,
+                'receipt_line_count' => 0,
+                'customer_sync_line_count' => 0,
+                'payment_count' => 0,
+                'receipt_reference' => $this->buildReference($payload),
+                'pre_migration' => $preMigrationSnapshot->toArray(),
+                'cross_reference' => null,
+                'customer_sync' => [
+                    'status' => 'skipped',
+                    'line_count' => 0,
+                    'lines' => [],
+                    'reason' => 'receipt_already_exists_in_siesa',
+                ],
+                'siesa_state' => $siesaStateBefore->toArray(),
+                'already_migrated' => true,
+                'timings_ms' => $timings,
+            ];
         }
 
-        $this->soapConfigurationValidator->validate();
-        $this->legacyStateService->markMigrationStarted($payload);
+        $measure('validate_soap_configuration', fn () => $this->soapConfigurationValidator->validate());
+        $measure('mark_migration_started', fn () => $this->legacyStateService->markMigrationStarted($payload));
         $importSucceeded = false;
 
         try {
-            $crossReference = $this->crossReferenceGuard->assertExists($payload, $header);
-            $customerSync = $this->customerSyncService->sync($payload, $header);
-            $payments = $this->repository->findPayments($payload);
-            $receiptLines = $this->lineFactory->build($header, $payments);
+            $crossReference = $measure('cross_reference_guard', fn () => $this->crossReferenceGuard->assertExists($payload, $header));
+            $customerSync = $measure('customer_sync', fn () => $this->customerSyncService->sync($payload, $header));
+            $payments = $measure('find_payments', fn () => $this->repository->findPayments($payload));
+            $receiptLines = $measure('build_receipt_lines', fn () => $this->lineFactory->build($header, $payments));
             $lines = array_merge($customerSync['lines'] ?? [], $receiptLines);
-            $audit = $this->auditService->import($lines, [
+            $audit = $measure('audit_import', fn () => $this->auditService->import($lines, [
                 'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
                 'task_type' => $payload['_workerhub_task_type'] ?? 'receipt_migration',
                 'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
@@ -66,7 +92,7 @@ class ReceiptMigrationService
                 'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
                 'payment_count' => count($payments),
                 'customer_sync' => $customerSync,
-            ]);
+            ]));
             $result = $audit->result;
 
             if (!$result->success) {
@@ -81,12 +107,12 @@ class ReceiptMigrationService
                 );
             }
 
-            $this->legacyStateService->markMigrated($payload);
+            $measure('mark_migrated', fn () => $this->legacyStateService->markMigrated($payload));
             $importSucceeded = true;
-            $siesaStateAfter = $this->siesaStateService->fetch($payload, $header);
+            $siesaStateAfter = $measure('fetch_siesa_state_after', fn () => $this->siesaStateService->fetch($payload, $header));
 
             if ($siesaStateAfter->exists) {
-                $this->legacyStateService->markDetectedInSiesa($payload);
+                $measure('mark_detected_in_siesa_after_import', fn () => $this->legacyStateService->markDetectedInSiesa($payload));
             }
 
             return [
@@ -105,10 +131,11 @@ class ReceiptMigrationService
                 'cross_reference' => $crossReference->toArray(),
                 'customer_sync' => $customerSync,
                 'siesa_state' => $siesaStateAfter->toArray(),
+                'timings_ms' => $timings,
             ];
         } catch (Throwable $exception) {
             if (!$importSucceeded) {
-                $this->legacyStateService->markMigrationFailed($payload);
+                $measure('mark_migration_failed', fn () => $this->legacyStateService->markMigrationFailed($payload));
             }
 
             throw $exception;

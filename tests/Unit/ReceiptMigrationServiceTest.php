@@ -290,7 +290,7 @@ class ReceiptMigrationServiceTest extends TestCase
         ]);
     }
 
-    public function test_it_stops_when_the_receipt_already_exists_in_siesa(): void
+    public function test_it_resolves_when_the_receipt_already_exists_in_siesa(): void
     {
         $repository = Mockery::mock(ReceiptPrototypeRepository::class);
         $repository->shouldReceive('findHeader')->once()->andReturn((object) [
@@ -349,16 +349,19 @@ class ReceiptMigrationServiceTest extends TestCase
             $legacyState
         );
 
-        $this->expectException(WorkerTaskProcessingException::class);
-        $this->expectExceptionMessage('El recibo ya existe en Siesa y no debe retransmitirse.');
-
-        $service->handle([
+        $result = $service->handle([
             'document_id' => '001-RX-1001',
             'db_connection' => 'sqlsrv',
             'operational_center' => '001',
             'document_type' => 'RX',
             'document_number' => '1001',
         ]);
+
+        $this->assertSame('001-RX-1001', $result['document_id']);
+        $this->assertTrue($result['already_migrated']);
+        $this->assertSame('receipt_already_exists_in_siesa', $result['customer_sync']['reason']);
+        $this->assertTrue($result['siesa_state']['exists']);
+        $this->assertArrayHasKey('timings_ms', $result);
     }
 
     /**
