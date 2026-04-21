@@ -8,6 +8,7 @@ use App\Data\SiesaWebServiceLogRecord;
 use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\OrderMigrationService;
+use App\Services\Workers\Orders\OrderCashConversionService;
 use App\Services\Workers\Orders\OrderCustomerSyncService;
 use App\Services\Workers\Orders\OrderLegacyStateService;
 use App\Services\Workers\Orders\OrderLineFactory;
@@ -48,6 +49,9 @@ class OrderMigrationServiceTest extends TestCase
         $repository->shouldReceive('findHeader')->once()->andReturn($header);
         $repository->shouldReceive('findOrderRecord')->once()->andReturn($orderRecord);
         $repository->shouldReceive('findDetails')->once()->andReturn($details);
+
+        $cashConversion = Mockery::mock(OrderCashConversionService::class);
+        $cashConversion->shouldReceive('normalizeIfSupported')->once()->andReturn(false);
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
@@ -127,6 +131,7 @@ class OrderMigrationServiceTest extends TestCase
             $validator,
             $guard,
             $repository,
+            $cashConversion,
             $customerSync,
             $lineFactory,
             $siesaStateService,
@@ -163,6 +168,9 @@ class OrderMigrationServiceTest extends TestCase
             'PE_OrdenDeCompra' => 'OC-24116',
         ]);
         $repository->shouldNotReceive('findDetails');
+
+        $cashConversion = Mockery::mock(OrderCashConversionService::class);
+        $cashConversion->shouldReceive('normalizeIfSupported')->once()->andReturn(false);
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldNotReceive('validate');
@@ -201,6 +209,7 @@ class OrderMigrationServiceTest extends TestCase
             $validator,
             $guard,
             $repository,
+            $cashConversion,
             $customerSync,
             $lineFactory,
             $siesaStateService,

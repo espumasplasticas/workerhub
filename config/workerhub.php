@@ -190,6 +190,10 @@ return [
                 'serepcol' => env('WORKERHUB_ORDER_SEREPCOL_MOTIVE', ''),
             ],
         ],
+        'cash_conversion' => [
+            'cash_registers_table' => env('WORKERHUB_ORDER_CASH_REGISTERS_TABLE', 'SiesaEnterprise.dbo.t291_co_cajas'),
+            'supported_payments_procedure' => env('WORKERHUB_ORDER_SUPPORTED_PAYMENTS_PROCEDURE', 'ventas.usp_obtener_medidos_pago_del_valor_que_soporta_la_venta_V2'),
+        ],
         'customer_sync' => [
             'enabled' => filter_var(env('WORKERHUB_ORDER_CUSTOMER_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
         ],

@@ -4,6 +4,7 @@ namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\Orders\OrderCustomerSyncService;
+use App\Services\Workers\Orders\OrderCashConversionService;
 use App\Services\Workers\Orders\OrderLegacyStateService;
 use App\Services\Workers\Orders\OrderLineFactory;
 use App\Services\Workers\Orders\OrderPreMigrationGuard;
@@ -18,6 +19,7 @@ class OrderMigrationService
         private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
         private readonly OrderPreMigrationGuard $preMigrationGuard,
         private readonly OrderPrototypeRepository $repository,
+        private readonly OrderCashConversionService $cashConversionService,
         private readonly OrderCustomerSyncService $customerSyncService,
         private readonly OrderLineFactory $lineFactory,
         private readonly OrderSiesaStateService $siesaStateService,
@@ -30,6 +32,11 @@ class OrderMigrationService
         $orderRecord = $this->repository->findOrderRecord($payload);
         $preMigrationSnapshot = $this->preMigrationGuard->assertCanMigrate($payload, $orderRecord);
         $header = $this->repository->findHeader($payload);
+
+        if ($this->cashConversionService->normalizeIfSupported($payload, $header)) {
+            $header = $this->repository->findHeader($payload);
+        }
+
         $siesaStateBefore = $this->siesaStateService->fetch($payload, $header);
 
         if ($siesaStateBefore->exists) {
