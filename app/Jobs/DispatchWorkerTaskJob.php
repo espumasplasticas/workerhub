@@ -2,7 +2,10 @@
 
 namespace App\Jobs;
 
+use App\Services\Integrations\Api\InvoiceMigrationNotificationClient;
+use App\Services\Integrations\Api\OrderCancellationNotificationClient;
 use App\Services\Integrations\Api\OrderMigrationNotificationClient;
+use App\Services\Integrations\Api\ReceiptCancellationNotificationClient;
 use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
@@ -26,7 +29,10 @@ class DispatchWorkerTaskJob implements ShouldQueue
     public function handle(
         WorkerTaskRouter $taskRouter,
         WorkerTaskMonitorService $monitor,
+        InvoiceMigrationNotificationClient $invoiceNotificationClient,
+        OrderCancellationNotificationClient $orderCancellationNotificationClient,
         OrderMigrationNotificationClient $orderNotificationClient,
+        ReceiptCancellationNotificationClient $receiptCancellationNotificationClient,
         ReceiptMigrationNotificationClient $notificationClient
     ): void {
         $taskId = (string) ($this->task['task_id'] ?? '');
@@ -38,7 +44,10 @@ class DispatchWorkerTaskJob implements ShouldQueue
 
             $this->task['result'] = $result;
             $monitor->markCompleted($taskId, $result);
+            $this->notifyInvoiceMigrationIfNeeded($invoiceNotificationClient, $monitor, $taskId);
+            $this->notifyOrderCancellationIfNeeded($orderCancellationNotificationClient, $monitor, $taskId);
             $this->notifyOrderMigrationIfNeeded($orderNotificationClient, $monitor, $taskId);
+            $this->notifyReceiptCancellationIfNeeded($receiptCancellationNotificationClient, $monitor, $taskId);
             $this->notifyReceiptMigrationIfNeeded($notificationClient, $monitor, $taskId);
         } catch (Throwable $exception) {
             $this->reportFailure($monitor, $taskId, $exception);
@@ -63,7 +72,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
         WorkerTaskMonitorService $monitor,
         string $taskId
     ): void {
-        if (($this->task['type'] ?? null) !== 'receipt_migration') {
+        if (!in_array(($this->task['type'] ?? null), ['receipt_migration', 'receipt_cancellation'], true)) {
             return;
         }
 
@@ -88,6 +97,10 @@ class DispatchWorkerTaskJob implements ShouldQueue
         }
 
         try {
+            if (($this->task['type'] ?? null) === 'receipt_cancellation') {
+                return;
+            }
+
             $notificationClient->notifyReceiptMigrated($this->task);
 
             if ($taskId !== '') {
@@ -123,7 +136,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
         WorkerTaskMonitorService $monitor,
         string $taskId
     ): void {
-        if (($this->task['type'] ?? null) !== 'order_migration') {
+        if (!in_array(($this->task['type'] ?? null), ['order_migration', 'order_cancellation'], true)) {
             return;
         }
 
@@ -148,6 +161,10 @@ class DispatchWorkerTaskJob implements ShouldQueue
         }
 
         try {
+            if (($this->task['type'] ?? null) === 'order_cancellation') {
+                return;
+            }
+
             $notificationClient->notifyOrderMigrated($this->task);
 
             if ($taskId !== '') {
@@ -182,6 +199,99 @@ class DispatchWorkerTaskJob implements ShouldQueue
     {
         return Arr::get($this->task, 'payload.created_by_user_id')
             ?? Arr::get($this->task, 'payload.metadata.created_by_user_id');
+    }
+
+    private function notifyReceiptCancellationIfNeeded(
+        ReceiptCancellationNotificationClient $notificationClient,
+        WorkerTaskMonitorService $monitor,
+        string $taskId
+    ): void {
+        if (($this->task['type'] ?? null) !== 'receipt_cancellation') {
+            return;
+        }
+
+        if (Arr::get($this->task, 'payload.source') !== 'api') {
+            return;
+        }
+
+        $createdByUserId = $this->resolveCreatedByUserId();
+
+        if (!is_numeric($createdByUserId)) {
+            return;
+        }
+
+        $notificationClient->notifyReceiptCancelled($this->task);
+        $monitor->addEvent(
+            $taskId,
+            'task.notification.receipt_cancelled',
+            'User notified in API after Siesa receipt cancellation.',
+            [
+                'document_id' => Arr::get($this->task, 'payload.document_id'),
+                'created_by_user_id' => (int) $createdByUserId,
+            ]
+        );
+    }
+
+    private function notifyOrderCancellationIfNeeded(
+        OrderCancellationNotificationClient $notificationClient,
+        WorkerTaskMonitorService $monitor,
+        string $taskId
+    ): void {
+        if (($this->task['type'] ?? null) !== 'order_cancellation') {
+            return;
+        }
+
+        if (Arr::get($this->task, 'payload.source') !== 'api') {
+            return;
+        }
+
+        $createdByUserId = $this->resolveCreatedByUserId();
+
+        if (!is_numeric($createdByUserId)) {
+            return;
+        }
+
+        $notificationClient->notifyOrderCancelled($this->task);
+        $monitor->addEvent(
+            $taskId,
+            'task.notification.order_cancelled',
+            'User notified in API after Siesa order cancellation.',
+            [
+                'document_id' => Arr::get($this->task, 'payload.document_id'),
+                'created_by_user_id' => (int) $createdByUserId,
+            ]
+        );
+    }
+
+    private function notifyInvoiceMigrationIfNeeded(
+        InvoiceMigrationNotificationClient $notificationClient,
+        WorkerTaskMonitorService $monitor,
+        string $taskId
+    ): void {
+        if (($this->task['type'] ?? null) !== 'invoice_migration') {
+            return;
+        }
+
+        if (Arr::get($this->task, 'payload.source') !== 'api') {
+            return;
+        }
+
+        $createdByUserId = $this->resolveCreatedByUserId();
+
+        if (!is_numeric($createdByUserId)) {
+            return;
+        }
+
+        $notificationClient->notifyInvoiceMigrated($this->task);
+        $monitor->addEvent(
+            $taskId,
+            'task.notification.invoice_migrated',
+            'User notified in API after Siesa invoice migration.',
+            [
+                'document_id' => Arr::get($this->task, 'payload.document_id'),
+                'created_by_user_id' => (int) $createdByUserId,
+            ]
+        );
     }
 
     private function reportFailure(

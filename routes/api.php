@@ -2,7 +2,10 @@
 
 use App\Http\Controllers\Api\DocumentMigrationController;
 use App\Http\Controllers\Api\HealthController;
+use App\Http\Controllers\Api\InvoiceMigrationController;
+use App\Http\Controllers\Api\OrderCancellationController;
 use App\Http\Controllers\Api\OrderMigrationController;
+use App\Http\Controllers\Api\ReceiptCancellationController;
 use App\Http\Controllers\Api\ReceiptMigrationController;
 use App\Http\Controllers\Api\WorkerTaskLifecycleController;
 use App\Http\Controllers\Api\WorkerTaskMonitorController;
@@ -29,7 +32,10 @@ Route::get('/health/workerhub', HealthController::class);
 Route::post('/worker-tasks', [WorkerTaskController::class, 'store']);
 Route::post('/document-migrations', [DocumentMigrationController::class, 'store']);
 Route::post('/order-migrations', [OrderMigrationController::class, 'store']);
+Route::post('/order-cancellations', [OrderCancellationController::class, 'store']);
 Route::post('/receipt-migrations', [ReceiptMigrationController::class, 'store']);
+Route::post('/receipt-cancellations', [ReceiptCancellationController::class, 'store']);
+Route::post('/invoice-migrations', [InvoiceMigrationController::class, 'store']);
 Route::post('/internal/tasks/{taskId}/status', [WorkerTaskLifecycleController::class, 'update']);
 Route::middleware(['web', 'workerhub.operator'])->group(function () {
     Route::get('/monitor/tasks', [WorkerTaskMonitorController::class, 'index']);

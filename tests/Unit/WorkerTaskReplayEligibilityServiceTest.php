@@ -3,6 +3,8 @@
 namespace Tests\Unit;
 
 use App\Models\WorkerTask;
+use App\Services\Workers\Invoices\InvoicePrototypeRepository;
+use App\Services\Workers\Invoices\InvoiceSiesaStateService;
 use App\Services\Workers\Orders\OrderPrototypeRepository;
 use App\Services\Workers\Orders\OrderSiesaStateService;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
@@ -27,6 +29,12 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
             ],
         ]);
 
+        $invoiceRepository = Mockery::mock(InvoicePrototypeRepository::class);
+        $invoiceRepository->shouldNotReceive('findHeader');
+
+        $invoiceSiesaStateService = Mockery::mock(InvoiceSiesaStateService::class);
+        $invoiceSiesaStateService->shouldNotReceive('fetch');
+
         $orderRepository = Mockery::mock(OrderPrototypeRepository::class);
         $orderRepository->shouldReceive('findHeader')->once()->andReturn((object) [
             'f430_id_co' => '002',
@@ -46,6 +54,8 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
         $receiptSiesaStateService->shouldNotReceive('fetch');
 
         $service = new WorkerTaskReplayEligibilityService(
+            $invoiceRepository,
+            $invoiceSiesaStateService,
             $orderRepository,
             $orderSiesaStateService,
             $receiptRepository,
@@ -73,6 +83,12 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
             ],
         ]);
 
+        $invoiceRepository = Mockery::mock(InvoicePrototypeRepository::class);
+        $invoiceRepository->shouldNotReceive('findHeader');
+
+        $invoiceSiesaStateService = Mockery::mock(InvoiceSiesaStateService::class);
+        $invoiceSiesaStateService->shouldNotReceive('fetch');
+
         $orderRepository = Mockery::mock(OrderPrototypeRepository::class);
         $orderRepository->shouldNotReceive('findHeader');
 
@@ -92,6 +108,8 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
             ->andReturn(new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', true, '001', 'RX', '1001'));
 
         $service = new WorkerTaskReplayEligibilityService(
+            $invoiceRepository,
+            $invoiceSiesaStateService,
             $orderRepository,
             $orderSiesaStateService,
             $receiptRepository,
@@ -112,6 +130,12 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
             'status' => 'failed',
         ]);
 
+        $invoiceRepository = Mockery::mock(InvoicePrototypeRepository::class);
+        $invoiceRepository->shouldNotReceive('findHeader');
+
+        $invoiceSiesaStateService = Mockery::mock(InvoiceSiesaStateService::class);
+        $invoiceSiesaStateService->shouldNotReceive('fetch');
+
         $orderRepository = Mockery::mock(OrderPrototypeRepository::class);
         $orderRepository->shouldNotReceive('findHeader');
 
@@ -125,6 +149,8 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
         $receiptSiesaStateService->shouldNotReceive('fetch');
 
         $service = new WorkerTaskReplayEligibilityService(
+            $invoiceRepository,
+            $invoiceSiesaStateService,
             $orderRepository,
             $orderSiesaStateService,
             $receiptRepository,

@@ -96,6 +96,46 @@ class ReceiptLegacyStateService
         ]);
     }
 
+    public function markCancellationRequested(array $payload): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $this->receiptQuery($payload)->update([
+            'RE_IndicadorSolicitudAnular' => 1,
+        ]);
+    }
+
+    public function markCancelled(array $payload, string $comments = 'Anulado desde WorkerHub'): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $timestamp = Carbon::now();
+
+        $this->receiptQuery($payload)->update([
+            'RE_IndicadorMigrado' => 1,
+            'RE_IndicadorAprobadoPorCartera' => 1,
+            'RE_IndicadorSolicitudAnular' => 1,
+            'RE_IndicadorAnulado' => 1,
+            'RE_FechaAnulado' => $timestamp,
+            'RE_CodigoUsuarioAnulo' => $this->serviceUserId(),
+            'RE_EstadoVerificadoExportacion' => 2,
+            'RE_FechaVerificacionExportacion' => $timestamp,
+            'RE_SolicitudAnularComentarios' => $comments,
+        ]);
+
+        $this->upsertHistory($payload, [
+            'RH_IndicadorVerificado' => 1,
+            'RH_FechaVerificado' => $timestamp,
+            'RH_IdUsuarioVerifico' => $this->serviceUserId(),
+            'RH_IndicadorPedidoEstaMigrado' => 1,
+            'RH_ConsecutivoDeMigracion' => 0,
+        ]);
+    }
+
     /**
      * @param array<string, mixed> $attributes
      */

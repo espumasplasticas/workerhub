@@ -31,6 +31,26 @@ class ReceiptLineFactory
         return $lines;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function buildCancellation(stdClass $headerRow): array
+    {
+        $cancellationHeader = clone $headerRow;
+        $existingNotes = trim((string) ($cancellationHeader->F350_NOTAS ?? ''));
+        $automaticNotes = sprintf(
+            '***ANULADO*** POR PROCESO AUTOMATICO FECHA: %s',
+            now()->format('Y-m-d H:i:s')
+        );
+
+        $cancellationHeader->F350_IND_ESTADO = 2;
+        $cancellationHeader->F350_NOTAS = trim($existingNotes . ' ' . $automaticNotes);
+
+        return [
+            (new LegacyReceiptHeaderAdapter($this->toHeaderConnector($cancellationHeader)))->toLine(),
+        ];
+    }
+
     private function toHeaderConnector(stdClass $row): PrototipoReciboEncabezado
     {
         $connector = new PrototipoReciboEncabezado();

@@ -34,7 +34,10 @@ return [
     'api' => [
         'base_url' => env('API_BASE_URL', 'http://127.0.0.1:3010'),
         'receipt_migration_notifications_endpoint' => env('API_RECEIPT_MIGRATION_NOTIFICATIONS_ENDPOINT', '/api/internal/workerhub/receipts/migrated'),
+        'receipt_cancellation_notifications_endpoint' => env('API_RECEIPT_CANCELLATION_NOTIFICATIONS_ENDPOINT', '/api/internal/workerhub/receipts/cancelled'),
         'order_migration_notifications_endpoint' => env('API_ORDER_MIGRATION_NOTIFICATIONS_ENDPOINT', '/api/internal/workerhub/orders/migrated'),
+        'order_cancellation_notifications_endpoint' => env('API_ORDER_CANCELLATION_NOTIFICATIONS_ENDPOINT', '/api/internal/workerhub/orders/cancelled'),
+        'invoice_migration_notifications_endpoint' => env('API_INVOICE_MIGRATION_NOTIFICATIONS_ENDPOINT', '/api/internal/workerhub/invoices/migrated'),
         'timeout' => (int) env('API_TIMEOUT_SECONDS', 10),
         'workerhub_notification_token' => env('API_WORKERHUB_NOTIFICATION_TOKEN', ''),
     ],

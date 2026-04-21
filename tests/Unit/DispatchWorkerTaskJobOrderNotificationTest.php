@@ -3,7 +3,10 @@
 namespace Tests\Unit;
 
 use App\Jobs\DispatchWorkerTaskJob;
+use App\Services\Integrations\Api\InvoiceMigrationNotificationClient;
+use App\Services\Integrations\Api\OrderCancellationNotificationClient;
 use App\Services\Integrations\Api\OrderMigrationNotificationClient;
+use App\Services\Integrations\Api\ReceiptCancellationNotificationClient;
 use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
@@ -48,10 +51,27 @@ class DispatchWorkerTaskJobOrderNotificationTest extends TestCase
         $orderNotificationClient = Mockery::mock(OrderMigrationNotificationClient::class);
         $orderNotificationClient->shouldReceive('notifyOrderMigrated')->once()->with(Mockery::type('array'));
 
+        $invoiceNotificationClient = Mockery::mock(InvoiceMigrationNotificationClient::class);
+        $invoiceNotificationClient->shouldNotReceive('notifyInvoiceMigrated');
+
+        $orderCancellationNotificationClient = Mockery::mock(OrderCancellationNotificationClient::class);
+        $orderCancellationNotificationClient->shouldNotReceive('notifyOrderCancelled');
+
+        $receiptCancellationNotificationClient = Mockery::mock(ReceiptCancellationNotificationClient::class);
+        $receiptCancellationNotificationClient->shouldNotReceive('notifyReceiptCancelled');
+
         $receiptNotificationClient = Mockery::mock(ReceiptMigrationNotificationClient::class);
         $receiptNotificationClient->shouldNotReceive('notifyReceiptMigrated');
 
         $job = new DispatchWorkerTaskJob($task);
-        $job->handle($router, $monitor, $orderNotificationClient, $receiptNotificationClient);
+        $job->handle(
+            $router,
+            $monitor,
+            $invoiceNotificationClient,
+            $orderCancellationNotificationClient,
+            $orderNotificationClient,
+            $receiptCancellationNotificationClient,
+            $receiptNotificationClient
+        );
     }
 }

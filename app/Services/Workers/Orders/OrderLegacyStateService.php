@@ -140,6 +140,55 @@ class OrderLegacyStateService
         $this->markChainOrderImported($payload);
     }
 
+    public function markCancellationRequested(array $payload): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $this->orderQuery($payload)->update([
+            'PE_IndicadorSolicitadoManual' => 1,
+        ]);
+    }
+
+    public function markCancelled(array $payload, ?OrderSiesaStateSnapshot $snapshot = null): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $timestamp = Carbon::now();
+        $updates = [
+            'PE_IndicadorMigrado' => 1,
+            'PE_EstadoVerificadoExportacion' => 2,
+            'PE_FechaVerificacionExportacion' => $timestamp,
+            'PE_IndicadorAnulado' => 1,
+            'PE_fecha_anulacion' => $timestamp,
+        ];
+
+        if ($snapshot?->rowId !== null) {
+            $updates['PE_rowid_t430_pedido'] = $snapshot->rowId;
+        }
+
+        $this->orderQuery($payload)->update($updates);
+
+        $this->upsertHistory($payload, [
+            'PH_IndicadorVerificado' => 1,
+            'PH_FechaVerificado' => $timestamp,
+            'PH_IdUsuarioVerifico' => $this->serviceUserId(),
+            'PH_IndicadorPedidoEstaMigrado' => 1,
+            'PH_ConsecutivoDeMigracion' => 0,
+            'PH_Text' => sprintf(
+                'Pedido %s-%s-%s anulado correctamente en Siesa.',
+                trim((string) ($payload['operational_center'] ?? '')),
+                trim((string) ($payload['document_type'] ?? '')),
+                trim((string) ($payload['document_number'] ?? ''))
+            ),
+        ]);
+
+        $this->markChainOrderImported($payload);
+    }
+
     /**
      * @param array<string, mixed> $attributes
      */

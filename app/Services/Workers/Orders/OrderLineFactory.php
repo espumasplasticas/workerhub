@@ -64,6 +64,22 @@ class OrderLineFactory
         return $lines;
     }
 
+    /**
+     * @return list<string>
+     */
+    public function buildCancellation(array $payload, stdClass $header, stdClass $orderRecord): array
+    {
+        $connection = $this->connectionFor((string) ($payload['db_connection'] ?? ''));
+        $mutatedHeader = $this->mutateHeader($connection, $header, $orderRecord);
+        $mutatedHeader->f430_ind_estado = 9;
+
+        return [
+            (new LegacySalesOrderHeaderAdapter(
+                $this->hydrate(new PrototipoPedidoEncabezado(), $mutatedHeader)
+            ))->toLine(),
+        ];
+    }
+
     private function mutateHeader(ConnectionInterface $connection, stdClass $header, stdClass $orderRecord): stdClass
     {
         $header = clone $header;

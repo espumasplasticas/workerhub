@@ -30,11 +30,29 @@ return [
             'tries' => (int) env('WORKERHUB_RECEIPT_MIGRATION_TRIES', 3),
             'timeout' => (int) env('WORKERHUB_RECEIPT_MIGRATION_TIMEOUT', 300),
         ],
+        'receipt_cancellation' => [
+            'queue' => env('WORKERHUB_RECEIPT_CANCELLATION_QUEUE', env('WORKERHUB_RECEIPTS_QUEUE', 'receipts-default')),
+            'high_priority_queue' => env('WORKERHUB_RECEIPT_CANCELLATION_HIGH_QUEUE', env('WORKERHUB_RECEIPTS_HIGH_QUEUE', 'receipts-high')),
+            'tries' => (int) env('WORKERHUB_RECEIPT_CANCELLATION_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_RECEIPT_CANCELLATION_TIMEOUT', 300),
+        ],
         'order_migration' => [
             'queue' => env('WORKERHUB_ORDER_MIGRATION_QUEUE', env('WORKERHUB_SALES_ORDERS_QUEUE', 'sales-orders-default')),
             'high_priority_queue' => env('WORKERHUB_ORDER_MIGRATION_HIGH_QUEUE', env('WORKERHUB_SALES_ORDERS_HIGH_QUEUE', 'sales-orders-high')),
             'tries' => (int) env('WORKERHUB_ORDER_MIGRATION_TRIES', 3),
             'timeout' => (int) env('WORKERHUB_ORDER_MIGRATION_TIMEOUT', 300),
+        ],
+        'order_cancellation' => [
+            'queue' => env('WORKERHUB_ORDER_CANCELLATION_QUEUE', env('WORKERHUB_SALES_ORDERS_QUEUE', 'sales-orders-default')),
+            'high_priority_queue' => env('WORKERHUB_ORDER_CANCELLATION_HIGH_QUEUE', env('WORKERHUB_SALES_ORDERS_HIGH_QUEUE', 'sales-orders-high')),
+            'tries' => (int) env('WORKERHUB_ORDER_CANCELLATION_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_ORDER_CANCELLATION_TIMEOUT', 300),
+        ],
+        'invoice_migration' => [
+            'queue' => env('WORKERHUB_INVOICE_MIGRATION_QUEUE', env('WORKERHUB_INVOICES_QUEUE', 'invoices-default')),
+            'high_priority_queue' => env('WORKERHUB_INVOICE_MIGRATION_HIGH_QUEUE', env('WORKERHUB_INVOICES_HIGH_QUEUE', 'invoices-high')),
+            'tries' => (int) env('WORKERHUB_INVOICE_MIGRATION_TRIES', 3),
+            'timeout' => (int) env('WORKERHUB_INVOICE_MIGRATION_TIMEOUT', 300),
         ],
     ],
 
@@ -168,6 +186,7 @@ return [
             'table' => env('WORKERHUB_RECEIPT_LEGACY_STATE_TABLE', env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado')),
             'history_table' => env('WORKERHUB_RECEIPT_LEGACY_STATE_HISTORY_TABLE', 'pos.recibos_historia_migracion'),
             'service_user_id' => (int) env('WORKERHUB_RECEIPT_LEGACY_STATE_SERVICE_USER_ID', 285),
+            'enterprise_cancellation_user_id' => (int) env('WORKERHUB_RECEIPT_LEGACY_STATE_ENTERPRISE_CANCELLATION_USER_ID', 285),
         ],
     ],
 
@@ -227,6 +246,34 @@ return [
             'mark_started' => filter_var(env('WORKERHUB_ORDER_LEGACY_STATE_MARK_STARTED', false), FILTER_VALIDATE_BOOL),
             'service_user_id' => (int) env('WORKERHUB_ORDER_LEGACY_STATE_SERVICE_USER_ID', 285),
             'verification_threshold' => (float) env('WORKERHUB_ORDER_LEGACY_VERIFICATION_THRESHOLD', 1000),
+        ],
+    ],
+
+    'invoices' => [
+        'source_connections' => [
+            'sqlsrv' => env('WORKERHUB_INVOICE_SOURCE_SQLSRV_CONNECTION', 'source_sqlsrv'),
+            'test' => env('WORKERHUB_INVOICE_SOURCE_TEST_CONNECTION', 'source_test'),
+        ],
+        'views' => [
+            'header' => env('WORKERHUB_INVOICE_HEADER_VIEW', 'prototipos.v_prototipos_facturas_encabezado_sala_ventas'),
+            'detail' => env('WORKERHUB_INVOICE_DETAIL_VIEW', 'prototipos.v_prototipos_facturas_detalle_sala_ventas'),
+            'payments' => env('WORKERHUB_INVOICE_PAYMENTS_VIEW', 'prototipos.v_prototipos_facturas_caja'),
+        ],
+        'tables' => [
+            'invoices' => env('WORKERHUB_INVOICE_TABLE', 'pos.facturas_encabezado'),
+            'details' => env('WORKERHUB_INVOICE_DETAILS_TABLE', 'pos.facturas_detalle'),
+            'cufe' => env('WORKERHUB_INVOICE_CUFE_TABLE', 'pos.facturas_cufe'),
+        ],
+        'enterprise_state' => [
+            'tables' => [
+                'commercial_documents' => env('WORKERHUB_INVOICE_ENTERPRISE_DOCUMENTS_TABLE', 'SiesaEnterprise.dbo.t461_cm_docto_factura'),
+                'document_headers' => env('WORKERHUB_INVOICE_ENTERPRISE_HEADERS_TABLE', 'SiesaEnterprise.dbo.t350_co_docto_contable'),
+                'document_lines' => env('WORKERHUB_INVOICE_ENTERPRISE_LINES_TABLE', 'SiesaEnterprise.dbo.t470_cm_movto'),
+            ],
+        ],
+        'legacy_state' => [
+            'enabled' => filter_var(env('WORKERHUB_INVOICE_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'service_user_id' => (int) env('WORKERHUB_INVOICE_LEGACY_STATE_SERVICE_USER_ID', 285),
         ],
     ],
 
