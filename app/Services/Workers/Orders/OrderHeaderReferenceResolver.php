@@ -20,6 +20,8 @@ class OrderHeaderReferenceResolver
                 $orderRecord?->PE_OrdenDeCargue ?? null,
                 $header->f430_referencia ?? null,
                 $orderRecord?->f430_referencia ?? null,
+                $header->PE_NumeroDocumento ?? null,
+                $orderRecord?->PE_NumeroDocumento ?? null,
             ),
             15
         );
@@ -31,6 +33,8 @@ class OrderHeaderReferenceResolver
                 $orderRecord?->PE_OrdenDeCargue ?? null,
                 $header->PE_OrdenDeCompra ?? null,
                 $orderRecord?->PE_OrdenDeCompra ?? null,
+                $header->PE_NumeroDocumento ?? null,
+                $orderRecord?->PE_NumeroDocumento ?? null,
             ),
             10
         );

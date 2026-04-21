@@ -174,6 +174,17 @@ class OrderLineFactory
             $detail->f431_id_unidad_medida = $unitOfMeasure;
         }
 
+        $resolvedCostCenter = $this->resolveLegacyMovementCostCenter(
+            trim((string) ($detail->f431_id_co ?? '')),
+            trim((string) ($detail->Clasificacion1 ?? '')),
+            trim((string) ($detail->CentroDeCosto ?? $detail->f431_id_ccosto_movto ?? ''))
+        );
+
+        if ($resolvedCostCenter !== '') {
+            $detail->CentroDeCosto = $resolvedCostCenter;
+            $detail->f431_id_ccosto_movto = $resolvedCostCenter;
+        }
+
         $sala = trim((string) ($header->PE_CodigoSalaDeVentas ?? ''));
         if ($sala === '0203') {
             $detail->f431_id_motivo = trim((string) ($header->PE_CodigoMotivo ?? '')) === 'ME' ? 'ME' : 'VE';
@@ -365,6 +376,23 @@ class OrderLineFactory
             ->value('FC_lapso_apertura');
 
         return is_numeric($value) ? (int) $value : 0;
+    }
+
+    private function resolveLegacyMovementCostCenter(string $operationCenter, string $classification, string $currentCostCenter): string
+    {
+        if ($currentCostCenter === '') {
+            return '';
+        }
+
+        if (class_exists(\Epsalibrary\Siesa\Connectors\db_mysql_prototipo_Service::class)) {
+            return trim((string) \Epsalibrary\Siesa\Connectors\db_mysql_prototipo_Service::getCentroDeCostoDetalleMovimiento(
+                $operationCenter,
+                $classification,
+                $currentCostCenter
+            ));
+        }
+
+        return $currentCostCenter;
     }
 
     private function connectionFor(string $sourceConnection): ConnectionInterface

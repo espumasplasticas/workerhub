@@ -56,4 +56,19 @@ class OrderHeaderReferenceResolverTest extends TestCase
         $this->assertSame('OC-ONLY', $resolved['reference_document_number']);
         $this->assertSame('OC-ONLY', $resolved['reference']);
     }
+
+    public function test_it_falls_back_to_order_document_number_when_no_external_references_exist(): void
+    {
+        $resolver = new OrderHeaderReferenceResolver();
+        $header = (object) [
+            'f430_num_docto_referencia' => '',
+            'f430_referencia' => '',
+            'PE_NumeroDocumento' => '22847',
+        ];
+
+        $resolved = $resolver->resolve($header);
+
+        $this->assertSame('22847', $resolved['reference_document_number']);
+        $this->assertSame('22847', $resolved['reference']);
+    }
 }
