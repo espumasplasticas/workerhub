@@ -42,7 +42,7 @@ class OrderMigrationService
         $preMigrationSnapshot = $measure('pre_migration_guard', fn () => $this->preMigrationGuard->assertCanMigrate($payload, $orderRecord));
         $header = $measure('find_header', fn () => $this->repository->findHeader($payload));
 
-        if ($measure('cash_conversion_normalize', fn () => $this->cashConversionService->normalizeIfSupported($payload, $header))) {
+        if ($measure('cash_conversion_normalize', fn () => $this->cashConversionService->normalizeIfSupported($payload, $header, $orderRecord))) {
             $header = $measure('find_header_after_cash_conversion', fn () => $this->repository->findHeader($payload));
         }
 

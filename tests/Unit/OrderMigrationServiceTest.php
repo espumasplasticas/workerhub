@@ -50,7 +50,11 @@ class OrderMigrationServiceTest extends TestCase
         $repository->shouldReceive('findDetails')->once()->andReturn($details);
 
         $cashConversion = Mockery::mock(OrderCashConversionService::class);
-        $cashConversion->shouldReceive('normalizeIfSupported')->once()->andReturn(false);
+        $cashConversion->shouldReceive('normalizeIfSupported')->once()->with(
+            Mockery::type('array'),
+            $header,
+            $orderRecord
+        )->andReturn(false);
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
@@ -169,7 +173,11 @@ class OrderMigrationServiceTest extends TestCase
         $repository->shouldNotReceive('findDetails');
 
         $cashConversion = Mockery::mock(OrderCashConversionService::class);
-        $cashConversion->shouldReceive('normalizeIfSupported')->once()->andReturn(false);
+        $cashConversion->shouldReceive('normalizeIfSupported')->once()->with(
+            Mockery::type('array'),
+            Mockery::type(stdClass::class),
+            Mockery::type(stdClass::class)
+        )->andReturn(false);
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldNotReceive('validate');
@@ -255,7 +263,11 @@ class OrderMigrationServiceTest extends TestCase
         $repository->shouldReceive('findDetails')->once()->andReturn($details);
 
         $cashConversion = Mockery::mock(OrderCashConversionService::class);
-        $cashConversion->shouldReceive('normalizeIfSupported')->once()->andReturn(false);
+        $cashConversion->shouldReceive('normalizeIfSupported')->once()->with(
+            Mockery::type('array'),
+            $header,
+            $orderRecord
+        )->andReturn(false);
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();

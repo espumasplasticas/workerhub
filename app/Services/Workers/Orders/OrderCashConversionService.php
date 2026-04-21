@@ -15,8 +15,12 @@ class OrderCashConversionService
     ) {
     }
 
-    public function normalizeIfSupported(array $payload, stdClass $header): bool
+    public function normalizeIfSupported(array $payload, stdClass $header, ?stdClass $orderRecord = null): bool
     {
+        if ($this->isAlreadyCashOrder($orderRecord)) {
+            return false;
+        }
+
         if (trim((string) ($header->f430_id_cond_pago ?? '')) !== '001') {
             return false;
         }
@@ -50,6 +54,18 @@ class OrderCashConversionService
         ]);
 
         return true;
+    }
+
+    private function isAlreadyCashOrder(?stdClass $orderRecord): bool
+    {
+        if (!$orderRecord instanceof stdClass) {
+            return false;
+        }
+
+        $paymentMethod = trim((string) ($orderRecord->PE_FormaDePago ?? ''));
+        $paymentCondition = trim((string) ($orderRecord->PE_CondicionDePago ?? ''));
+
+        return $paymentMethod === '0' && $paymentCondition === '0';
     }
 
     private function hasCashRegister999(ConnectionInterface $connection, string $enterpriseOperationalCenter): bool
