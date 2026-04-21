@@ -12,7 +12,9 @@ class OrderLineFactorySourceTest extends TestCase
 
         $this->assertIsString($source);
         $this->assertStringContainsString('resolveLegacyMovementCostCenter', $source);
-        $this->assertStringContainsString('\\Epsalibrary\\Siesa\\Connectors\\db_mysql_prototipo_Service::getCentroDeCostoDetalleMovimiento', $source);
+        $this->assertStringContainsString('findDetailOnlyCostCenter', $source);
+        $this->assertStringContainsString('findEquivalentCostCenter', $source);
+        $this->assertStringContainsString('fallbackLegacyMovementCostCenter', $source);
         $this->assertStringContainsString('$detail->CentroDeCosto = $resolvedCostCenter;', $source);
     }
 }

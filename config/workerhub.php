@@ -207,6 +207,8 @@ return [
             'companies' => env('WORKERHUB_ORDER_COMPANIES_TABLE', 'laravel_comodisimos.dbo.companies'),
             'item_units' => env('WORKERHUB_ORDER_ITEM_UNITS_TABLE', 'maestros_uno.cmitems_catalogo_de_items'),
             'activation_periods' => env('WORKERHUB_ORDER_ACTIVATION_PERIODS_TABLE', 'contabilidad.er_salas_fechas_activacion'),
+            'detail_only_cost_centers' => env('WORKERHUB_ORDER_DETAIL_ONLY_COST_CENTERS_TABLE', 'pos.centros_de_costo_solo_detalle'),
+            'cost_center_equivalences' => env('WORKERHUB_ORDER_COST_CENTER_EQUIVALENCES_TABLE', 'prototipos.equivalencia_centros_de_costo'),
         ],
         'enterprise_state' => [
             'tables' => [

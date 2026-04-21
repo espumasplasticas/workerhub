@@ -10,6 +10,7 @@ use Epsalibrary\Siesa\Connectors\PrototipoPedidoEncabezado;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DatabaseManager;
+use Illuminate\Database\QueryException;
 use stdClass;
 
 class OrderLineFactory
@@ -175,6 +176,7 @@ class OrderLineFactory
         }
 
         $resolvedCostCenter = $this->resolveLegacyMovementCostCenter(
+            $connection,
             trim((string) ($detail->f431_id_co ?? '')),
             trim((string) ($detail->Clasificacion1 ?? '')),
             trim((string) ($detail->CentroDeCosto ?? $detail->f431_id_ccosto_movto ?? ''))
@@ -378,21 +380,110 @@ class OrderLineFactory
         return is_numeric($value) ? (int) $value : 0;
     }
 
-    private function resolveLegacyMovementCostCenter(string $operationCenter, string $classification, string $currentCostCenter): string
+    private function resolveLegacyMovementCostCenter(
+        ConnectionInterface $connection,
+        string $operationCenter,
+        string $classification,
+        string $currentCostCenter
+    ): string
     {
         if ($currentCostCenter === '') {
             return '';
         }
 
-        if (class_exists(\Epsalibrary\Siesa\Connectors\db_mysql_prototipo_Service::class)) {
-            return trim((string) \Epsalibrary\Siesa\Connectors\db_mysql_prototipo_Service::getCentroDeCostoDetalleMovimiento(
-                $operationCenter,
-                $classification,
-                $currentCostCenter
-            ));
+        $detailOnlyCostCenter = $this->findDetailOnlyCostCenter($connection, $currentCostCenter);
+
+        if ($detailOnlyCostCenter !== null && $detailOnlyCostCenter !== '') {
+            return $detailOnlyCostCenter;
         }
 
-        return $currentCostCenter;
+        if ($this->isEnterpriseCostCenter($currentCostCenter)) {
+            return $currentCostCenter;
+        }
+
+        $equivalentCostCenter = $this->findEquivalentCostCenter($connection, $currentCostCenter);
+
+        if ($equivalentCostCenter !== null && $equivalentCostCenter !== '') {
+            return $equivalentCostCenter;
+        }
+
+        return $this->fallbackLegacyMovementCostCenter($operationCenter, $classification, $currentCostCenter);
+    }
+
+    private function findDetailOnlyCostCenter(ConnectionInterface $connection, string $costCenter): ?string
+    {
+        try {
+            $row = $connection->selectOne(
+                sprintf(
+                    'SELECT TOP 1 CC_IdCentroCostoEnterprise FROM %s WHERE RTRIM(CONVERT(varchar(50), unccosto_key1)) = ?',
+                    $this->detailOnlyCostCentersTable()
+                ),
+                [$costCenter]
+            );
+        } catch (QueryException) {
+            return null;
+        }
+
+        if (!$row instanceof stdClass) {
+            return null;
+        }
+
+        $resolved = trim((string) ($row->CC_IdCentroCostoEnterprise ?? ''));
+
+        return $resolved !== '' ? $resolved : null;
+    }
+
+    private function findEquivalentCostCenter(ConnectionInterface $connection, string $costCenter): ?string
+    {
+        try {
+            $row = $connection->selectOne(
+                sprintf(
+                    'SELECT TOP 1 CC_Enterprise FROM %s WHERE RTRIM(CONVERT(varchar(50), CC_Uno85)) = ?',
+                    $this->costCenterEquivalencesTable()
+                ),
+                [$costCenter]
+            );
+        } catch (QueryException) {
+            return null;
+        }
+
+        if (!$row instanceof stdClass) {
+            return null;
+        }
+
+        $resolved = trim((string) ($row->CC_Enterprise ?? ''));
+
+        return $resolved !== '' ? $resolved : null;
+    }
+
+    private function isEnterpriseCostCenter(string $costCenter): bool
+    {
+        return str_starts_with($costCenter, '022')
+            || in_array($costCenter, ['020902', '020305', '020109'], true);
+    }
+
+    private function fallbackLegacyMovementCostCenter(string $operationCenter, string $classification, string $currentCostCenter): string
+    {
+        $classificationCode = (int) $classification;
+        $isCommercialClassification = in_array($classificationCode, [1, 4], true);
+
+        if ($operationCenter === '001') {
+            return $isCommercialClassification ? '020902' : '020901';
+        }
+
+        if (!$isCommercialClassification) {
+            return '020901';
+        }
+
+        if (str_starts_with($currentCostCenter, '206102')) {
+            return '0220' . substr($currentCostCenter, 6);
+        }
+
+        if (str_starts_with($currentCostCenter, '206103')) {
+            return '0221' . substr($currentCostCenter, 6);
+        }
+
+        return '022000';
     }
 
     private function connectionFor(string $sourceConnection): ConnectionInterface
@@ -437,6 +528,16 @@ class OrderLineFactory
     private function activationPeriodsTable(): string
     {
         return (string) $this->config->get('workerhub.orders.tables.activation_periods', 'contabilidad.er_salas_fechas_activacion');
+    }
+
+    private function detailOnlyCostCentersTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.tables.detail_only_cost_centers', 'pos.centros_de_costo_solo_detalle');
+    }
+
+    private function costCenterEquivalencesTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.tables.cost_center_equivalences', 'prototipos.equivalencia_centros_de_costo');
     }
 
     private function chainThirdPartiesTable(): string
