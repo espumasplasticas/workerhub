@@ -195,6 +195,9 @@ return [
             'fast_supported_amount_query' => filter_var(env('WORKERHUB_ORDER_FAST_SUPPORTED_AMOUNT_QUERY', true), FILTER_VALIDATE_BOOL),
             'supported_payments_procedure' => env('WORKERHUB_ORDER_SUPPORTED_PAYMENTS_PROCEDURE', 'ventas.usp_obtener_medidos_pago_del_valor_que_soporta_la_venta_V2'),
         ],
+        'state' => [
+            'special_products_procedure' => env('WORKERHUB_ORDER_SPECIAL_PRODUCTS_PROCEDURE', 'pos.usp_pedido_productos_especiales'),
+        ],
         'customer_sync' => [
             'enabled' => filter_var(env('WORKERHUB_ORDER_CUSTOMER_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
         ],

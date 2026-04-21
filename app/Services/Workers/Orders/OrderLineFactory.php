@@ -87,6 +87,7 @@ class OrderLineFactory
             $header->f430_id_tipo_cli_fact = '0012';
         }
 
+        $header->f430_ind_estado = $this->resolveLegacyHeaderStateIndicator($connection, $header, $orderRecord);
         $header->f430_notas = $this->buildAdditionalDetail($header);
 
         if ((int) ($header->PE_IndicadorObsequio ?? 0) === 1) {
@@ -107,6 +108,50 @@ class OrderLineFactory
         }
 
         return $header;
+    }
+
+    private function resolveLegacyHeaderStateIndicator(ConnectionInterface $connection, stdClass $header, stdClass $orderRecord): int
+    {
+        $documentType = strtoupper(trim((string) ($orderRecord->PE_TipoDocumento ?? $header->PE_TipoDocumento ?? '')));
+        if (in_array($documentType, ['J1', 'A06'], true)) {
+            return 1;
+        }
+
+        $paymentCondition = strtoupper(trim((string) ($orderRecord->PE_CondicionDePago ?? $header->PE_CondicionDePago ?? $header->f430_id_cond_pago ?? '')));
+        if (!in_array($paymentCondition, ['DN', 'FE'], true)) {
+            return 1;
+        }
+
+        return $this->hasSpecialProducts($connection, $orderRecord) ? 0 : 1;
+    }
+
+    private function hasSpecialProducts(ConnectionInterface $connection, stdClass $orderRecord): bool
+    {
+        $operationalCenter = trim((string) ($orderRecord->PE_CentroOperativo ?? ''));
+        $documentType = trim((string) ($orderRecord->PE_TipoDocumento ?? ''));
+        $documentNumber = trim((string) ($orderRecord->PE_NumeroDocumento ?? ''));
+
+        if ($operationalCenter === '' || $documentType === '' || $documentNumber === '') {
+            return false;
+        }
+
+        $rows = $connection->select(
+            sprintf('EXEC %s ?, ?, ?', $this->specialProductsProcedure()),
+            [$operationalCenter, $documentType, $documentNumber]
+        );
+
+        $count = 0;
+
+        foreach ($rows as $row) {
+            foreach ((array) $row as $value) {
+                if (is_numeric($value)) {
+                    $count = (int) $value;
+                    break 2;
+                }
+            }
+        }
+
+        return $count > 0;
     }
 
     private function mutateDetail(ConnectionInterface $connection, stdClass $header, stdClass $detailRow): stdClass
@@ -558,5 +603,10 @@ class OrderLineFactory
     private function companiesTable(): string
     {
         return (string) $this->config->get('workerhub.orders.tables.companies', 'laravel_comodisimos.dbo.companies');
+    }
+
+    private function specialProductsProcedure(): string
+    {
+        return (string) $this->config->get('workerhub.orders.state.special_products_procedure', 'pos.usp_pedido_productos_especiales');
     }
 }

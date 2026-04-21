@@ -17,4 +17,16 @@ class OrderLineFactorySourceTest extends TestCase
         $this->assertStringContainsString('fallbackLegacyMovementCostCenter', $source);
         $this->assertStringContainsString('$detail->CentroDeCosto = $resolvedCostCenter;', $source);
     }
+
+    public function test_it_recomputes_order_header_state_using_legacy_rules(): void
+    {
+        $source = file_get_contents(app_path('Services/Workers/Orders/OrderLineFactory.php'));
+
+        $this->assertIsString($source);
+        $this->assertStringContainsString('resolveLegacyHeaderStateIndicator', $source);
+        $this->assertStringContainsString('hasSpecialProducts', $source);
+        $this->assertStringContainsString('$header->f430_ind_estado = $this->resolveLegacyHeaderStateIndicator', $source);
+        $this->assertStringContainsString("in_array(\$documentType, ['J1', 'A06'], true)", $source);
+        $this->assertStringContainsString("in_array(\$paymentCondition, ['DN', 'FE'], true)", $source);
+    }
 }
