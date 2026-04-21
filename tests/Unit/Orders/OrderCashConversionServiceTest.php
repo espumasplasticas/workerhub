@@ -39,7 +39,9 @@ class OrderCashConversionServiceTest extends TestCase
 
         $connection = Mockery::mock(ConnectionInterface::class);
         $connection->shouldReceive('table')->with('SiesaEnterprise.dbo.t291_co_cajas')->andReturn($cashRegistersBuilder);
-        $connection->shouldReceive('selectOne')->once()->with(Mockery::type('string'), ['98701987', '1'])
+        $connection->shouldReceive('selectOne')->once()->with(Mockery::type('string'), ['98701987'])
+            ->andReturn((object) ['rowid_tercero' => 12345]);
+        $connection->shouldReceive('selectOne')->once()->with(Mockery::type('string'), [12345, '1'])
             ->andReturn((object) ['total_supported_amount' => 163000]);
         $connection->shouldReceive('table')->with('pos.pedidos_encabezado')->andReturn($ordersBuilder);
 
@@ -90,7 +92,9 @@ class OrderCashConversionServiceTest extends TestCase
 
         $connection = Mockery::mock(ConnectionInterface::class);
         $connection->shouldReceive('table')->with('SiesaEnterprise.dbo.t291_co_cajas')->andReturn($cashRegistersBuilder);
-        $connection->shouldReceive('selectOne')->once()->with(Mockery::type('string'), ['98701987', '1'])
+        $connection->shouldReceive('selectOne')->once()->with(Mockery::type('string'), ['98701987'])
+            ->andReturn((object) ['rowid_tercero' => 12345]);
+        $connection->shouldReceive('selectOne')->once()->with(Mockery::type('string'), [12345, '1'])
             ->andReturn((object) ['total_supported_amount' => 0]);
         $connection->shouldReceive('select')->once()->with('EXEC ventas.usp_obtener_medidos_pago_del_valor_que_soporta_la_venta_V2 ?, ?', ['98701987', '1'])
             ->andReturn([(object) ['valor_saldo_cruzar' => 163000]]);

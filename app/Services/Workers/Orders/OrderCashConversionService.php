@@ -9,29 +9,27 @@ use stdClass;
 
 class OrderCashConversionService
 {
+    private const THIRD_PARTY_ROW_ID_SQL = <<<'SQL'
+SELECT TOP 1 f200_rowid AS rowid_tercero
+FROM SiesaEnterprise.dbo.t200_mm_terceros
+WHERE f200_id = ?
+  AND f200_id_cia = 1
+SQL;
+
     private const FAST_SUPPORTED_AMOUNT_SQL = <<<'SQL'
 SELECT SUM(t350.f350_total_db) AS total_supported_amount
 FROM SiesaEnterprise.dbo.t353_co_saldo_abierto AS t353
-INNER JOIN SiesaEnterprise.dbo.t200_mm_terceros AS t200
-    ON t353.f353_rowid_tercero = t200.f200_rowid
-    AND t353.f353_id_cia = t200.f200_id_cia
-INNER JOIN SiesaEnterprise.dbo.t201_mm_clientes AS t201
-    ON t201.f201_rowid_tercero = t200.f200_rowid
-    AND t201.f201_id_sucursal = t353.f353_id_sucursal
-    AND t201.f201_id_cia = t353.f353_id_cia
 INNER JOIN SiesaEnterprise.dbo.t253_co_auxiliares AS t253
     ON t353.f353_rowid_auxiliar = t253.f253_rowid
     AND t353.f353_id_cia = t253.f253_id_cia
-INNER JOIN SiesaEnterprise.dbo.t285_co_centro_op AS t285
-    ON t353.f353_id_co_cruce = t285.f285_id
-    AND t353.f353_id_cia = t285.f285_id_cia
 INNER JOIN SiesaEnterprise.dbo.t350_co_docto_contable AS t350
     ON t353.f353_rowid_docto = t350.f350_rowid
     AND t353.f353_id_cia = t350.f350_id_cia
-WHERE t350.f350_ind_estado = 1
+WHERE t353.f353_id_cia = 1
+  AND t353.f353_rowid_tercero = ?
+  AND t353.f353_id_sucursal = ?
+  AND t350.f350_ind_estado = 1
   AND (t353.f353_total_db - t353.f353_total_cr <> 0)
-  AND t200.f200_id = ?
-  AND t201.f201_id_sucursal = ?
   AND t253.f253_notas LIKE '%BALANCE%'
   AND t253.f253_id NOT IN ('28050558', '13050550')
 SQL;
@@ -137,9 +135,25 @@ SQL;
             return 0.0;
         }
 
-        $row = $connection->selectOne(self::FAST_SUPPORTED_AMOUNT_SQL, [$thirdPartyId, $branchId]);
+        $thirdPartyRowId = $this->findThirdPartyRowId($connection, $thirdPartyId);
+        if ($thirdPartyRowId <= 0) {
+            return 0.0;
+        }
+
+        $row = $connection->selectOne(self::FAST_SUPPORTED_AMOUNT_SQL, [$thirdPartyRowId, $branchId]);
 
         return (float) ($row->total_supported_amount ?? 0);
+    }
+
+    private function findThirdPartyRowId(ConnectionInterface $connection, string $thirdPartyId): int
+    {
+        if ($thirdPartyId === '') {
+            return 0;
+        }
+
+        $row = $connection->selectOne(self::THIRD_PARTY_ROW_ID_SQL, [$thirdPartyId]);
+
+        return (int) ($row->rowid_tercero ?? 0);
     }
 
     private function orderQuery(ConnectionInterface $connection, array $payload): \Illuminate\Database\Query\Builder
