@@ -340,32 +340,38 @@ return [
 
         'local' => [
             'supervisor-receipts' => [
-                'minProcesses' => 2,
-                'maxProcesses' => 8,
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
                 'balanceMaxShift' => 2,
                 'balanceCooldown' => 1,
             ],
             'supervisor-sales-orders' => [
-                'minProcesses' => 2,
-                'maxProcesses' => 6,
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
                 'balanceMaxShift' => 2,
                 'balanceCooldown' => 1,
             ],
             'supervisor-invoices' => [
-                'minProcesses' => 1,
-                'maxProcesses' => 3,
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
             'supervisor-customers' => [
                 'minProcesses' => 1,
                 'maxProcesses' => 2,
             ],
             'supervisor-general' => [
-                'minProcesses' => 1,
-                'maxProcesses' => 2,
+                'minProcesses' => 2,
+                'maxProcesses' => 8,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
             'supervisor-integrations' => [
-                'minProcesses' => 1,
-                'maxProcesses' => 2,
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
         ],
     ],
