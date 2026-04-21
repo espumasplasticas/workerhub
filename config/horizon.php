@@ -340,12 +340,16 @@ return [
 
         'local' => [
             'supervisor-receipts' => [
-                'minProcesses' => 1,
-                'maxProcesses' => 4,
+                'minProcesses' => 2,
+                'maxProcesses' => 8,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
             'supervisor-sales-orders' => [
-                'minProcesses' => 1,
-                'maxProcesses' => 3,
+                'minProcesses' => 2,
+                'maxProcesses' => 6,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
             'supervisor-invoices' => [
                 'minProcesses' => 1,
