@@ -20,7 +20,7 @@ class OrderLegacyStateService
 
     public function markMigrationStarted(array $payload): void
     {
-        if (!$this->isEnabled()) {
+        if (!$this->isEnabled() || !$this->markStartedEnabled()) {
             return;
         }
 
@@ -322,5 +322,10 @@ class OrderLegacyStateService
     private function isEnabled(): bool
     {
         return (bool) $this->config->get('workerhub.orders.legacy_state.enabled', true);
+    }
+
+    private function markStartedEnabled(): bool
+    {
+        return (bool) $this->config->get('workerhub.orders.legacy_state.mark_started', false);
     }
 }

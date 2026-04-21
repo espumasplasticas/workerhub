@@ -29,18 +29,27 @@ class OrderMigrationService
 
     public function handle(array $payload): array
     {
-        $orderRecord = $this->repository->findOrderRecord($payload);
-        $preMigrationSnapshot = $this->preMigrationGuard->assertCanMigrate($payload, $orderRecord);
-        $header = $this->repository->findHeader($payload);
+        $timings = [];
+        $measure = static function (string $name, callable $callback) use (&$timings) {
+            $startedAt = microtime(true);
+            $result = $callback();
+            $timings[$name] = round((microtime(true) - $startedAt) * 1000, 2);
 
-        if ($this->cashConversionService->normalizeIfSupported($payload, $header)) {
-            $header = $this->repository->findHeader($payload);
+            return $result;
+        };
+
+        $orderRecord = $measure('find_order_record', fn () => $this->repository->findOrderRecord($payload));
+        $preMigrationSnapshot = $measure('pre_migration_guard', fn () => $this->preMigrationGuard->assertCanMigrate($payload, $orderRecord));
+        $header = $measure('find_header', fn () => $this->repository->findHeader($payload));
+
+        if ($measure('cash_conversion_normalize', fn () => $this->cashConversionService->normalizeIfSupported($payload, $header))) {
+            $header = $measure('find_header_after_cash_conversion', fn () => $this->repository->findHeader($payload));
         }
 
-        $siesaStateBefore = $this->siesaStateService->fetch($payload, $header);
+        $siesaStateBefore = $measure('fetch_siesa_state_before', fn () => $this->siesaStateService->fetch($payload, $header));
 
         if ($siesaStateBefore->exists) {
-            $this->legacyStateService->markDetectedInSiesa($payload, $siesaStateBefore);
+            $measure('mark_detected_in_siesa', fn () => $this->legacyStateService->markDetectedInSiesa($payload, $siesaStateBefore));
 
             return [
                 'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
@@ -64,20 +73,22 @@ class OrderMigrationService
                 'siesa_state' => $siesaStateBefore->toArray(),
                 'legacy_net_total' => null,
                 'already_migrated' => true,
+                'timings_ms' => $timings,
             ];
         }
 
-        $this->soapConfigurationValidator->validate();
-            $this->legacyStateService->markMigrationStarted($payload);
-            $importSucceeded = false;
-            $legacyNetTotal = null;
+        $measure('validate_soap_configuration', fn () => $this->soapConfigurationValidator->validate());
+        $measure('mark_migration_started', fn () => $this->legacyStateService->markMigrationStarted($payload));
+        $importSucceeded = false;
+        $legacyNetTotal = null;
+        $siesaStateAfter = $siesaStateBefore;
 
         try {
-            $customerSync = $this->customerSyncService->sync($payload, $header);
-            $details = $this->repository->findDetails($payload);
-            $orderLines = $this->lineFactory->build($payload, $header, $orderRecord, $details);
+            $customerSync = $measure('customer_sync', fn () => $this->customerSyncService->sync($payload, $header));
+            $details = $measure('find_details', fn () => $this->repository->findDetails($payload));
+            $orderLines = $measure('build_order_lines', fn () => $this->lineFactory->build($payload, $header, $orderRecord, $details));
             $lines = array_merge($customerSync['lines'] ?? [], $orderLines);
-            $audit = $this->auditService->import($lines, [
+            $audit = $measure('audit_import', fn () => $this->auditService->import($lines, [
                 'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
                 'task_type' => $payload['_workerhub_task_type'] ?? 'order_migration',
                 'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
@@ -88,7 +99,7 @@ class OrderMigrationService
                 'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
                 'detail_count' => count($details),
                 'customer_sync' => $customerSync,
-            ]);
+            ]));
             $result = $audit->result;
 
             if (!$result->success) {
@@ -103,20 +114,20 @@ class OrderMigrationService
                 );
             }
 
-            $this->legacyStateService->markMigrated($payload);
+            $measure('mark_migrated', fn () => $this->legacyStateService->markMigrated($payload));
             $importSucceeded = true;
-            $siesaStateAfter = $this->siesaStateService->fetch($payload, $header);
+            $siesaStateAfter = $measure('fetch_siesa_state_after', fn () => $this->siesaStateService->fetch($payload, $header));
 
             if ($siesaStateAfter->exists) {
-                $this->legacyStateService->updateEnterpriseRowId($payload, $siesaStateAfter);
+                $measure('update_enterprise_row_id', fn () => $this->legacyStateService->updateEnterpriseRowId($payload, $siesaStateAfter));
 
-                $legacyNetTotal = $this->legacyStateService->computeLegacyNetTotal($payload);
+                $legacyNetTotal = $measure('compute_legacy_net_total', fn () => $this->legacyStateService->computeLegacyNetTotal($payload));
                 $enterpriseNetTotal = (float) ($siesaStateAfter->netTotal ?? 0);
                 $difference = abs($enterpriseNetTotal - $legacyNetTotal);
                 $isGift = (int) ($header->PE_IndicadorObsequio ?? 0) === 1;
 
                 if ($difference < $this->legacyStateService->verificationThreshold() || $isGift) {
-                    $this->legacyStateService->markVerified($payload, $siesaStateAfter, $legacyNetTotal);
+                    $measure('mark_verified', fn () => $this->legacyStateService->markVerified($payload, $siesaStateAfter, $legacyNetTotal));
                 }
             }
 
@@ -136,10 +147,11 @@ class OrderMigrationService
                 'customer_sync' => $customerSync,
                 'siesa_state' => $siesaStateAfter->toArray(),
                 'legacy_net_total' => $legacyNetTotal,
+                'timings_ms' => $timings,
             ];
         } catch (Throwable $exception) {
             if (!$importSucceeded) {
-                $this->legacyStateService->markMigrationFailed($payload);
+                $measure('mark_migration_failed', fn () => $this->legacyStateService->markMigrationFailed($payload));
             }
 
             throw $exception;

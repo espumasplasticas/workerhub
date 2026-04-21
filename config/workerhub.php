@@ -219,6 +219,7 @@ return [
         ],
         'legacy_state' => [
             'enabled' => filter_var(env('WORKERHUB_ORDER_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+            'mark_started' => filter_var(env('WORKERHUB_ORDER_LEGACY_STATE_MARK_STARTED', false), FILTER_VALIDATE_BOOL),
             'service_user_id' => (int) env('WORKERHUB_ORDER_LEGACY_STATE_SERVICE_USER_ID', 285),
             'verification_threshold' => (float) env('WORKERHUB_ORDER_LEGACY_VERIFICATION_THRESHOLD', 1000),
         ],
