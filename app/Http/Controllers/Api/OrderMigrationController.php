@@ -8,6 +8,7 @@ use App\Services\Workers\Orders\OrderLegacyStateService;
 use App\Services\Workers\Orders\OrderPrototypeRepository;
 use App\Services\Workers\Orders\OrderSiesaStateService;
 use App\Services\Workers\WorkerTaskDispatchService;
+use App\Services\Workers\WorkerTaskDispatchRegistryService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Support\WorkerTaskExecutionPlanResolver;
 use Illuminate\Http\JsonResponse;
@@ -19,6 +20,7 @@ class OrderMigrationController extends Controller
     public function __construct(
         private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
         private readonly WorkerTaskDispatchService $dispatcher,
+        private readonly WorkerTaskDispatchRegistryService $dispatchRegistry,
         private readonly WorkerTaskMonitorService $monitor,
         private readonly OrderPrototypeRepository $orderPrototypeRepository,
         private readonly OrderSiesaStateService $orderSiesaStateService,
@@ -69,6 +71,18 @@ class OrderMigrationController extends Controller
             'source' => $validated['source'] ?? 'api',
             'metadata' => $metadata,
         ];
+
+        $acceptedDispatch = $this->dispatchRegistry->findAccepted('order', $payload['document_id']);
+
+        if ($acceptedDispatch !== null) {
+            return response()->json([
+                'accepted' => true,
+                'duplicate' => true,
+                'task_id' => $acceptedDispatch->task_id,
+                'document_id' => $validated['document_id'],
+                'accepted_at' => $acceptedDispatch->accepted_at?->toIso8601String(),
+            ], 202);
+        }
 
         try {
             $header = $this->orderPrototypeRepository->findHeader($payload);
@@ -121,6 +135,8 @@ class OrderMigrationController extends Controller
         } else {
             $this->monitor->markQueued($taskId, (string) $dispatch['queue']);
         }
+
+        $this->dispatchRegistry->recordAcceptedForTask('order_migration', $payload, $taskId);
 
         return response()->json([
             'accepted' => true,

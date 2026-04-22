@@ -7,6 +7,7 @@ use App\Services\Workers\Orders\OrderLegacyStateService;
 use App\Services\Workers\Orders\OrderPrototypeRepository;
 use App\Services\Workers\Orders\OrderSiesaStateService;
 use App\Services\Workers\WorkerTaskDispatchService;
+use App\Services\Workers\WorkerTaskDispatchRegistryService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Support\WorkerTaskExecutionPlanResolver;
 use Illuminate\Http\Request;
@@ -37,6 +38,10 @@ class OrderMigrationControllerTest extends TestCase
                 'queue' => 'sales-orders-default',
             ]);
 
+        $registry = Mockery::mock(WorkerTaskDispatchRegistryService::class);
+        $registry->shouldReceive('findAccepted')->once()->with('order', '002-FC-24116')->andReturnNull();
+        $registry->shouldReceive('recordAcceptedForTask')->once()->with('order_migration', Mockery::type('array'), '11111111-1111-1111-1111-111111111111');
+
         $monitor = Mockery::mock(WorkerTaskMonitorService::class);
         $monitor->shouldReceive('createTask')->once();
         $monitor->shouldReceive('markQueued')->once()->with('11111111-1111-1111-1111-111111111111', 'sales-orders-default');
@@ -59,6 +64,7 @@ class OrderMigrationControllerTest extends TestCase
         $controller = new OrderMigrationController(
             $resolver,
             $dispatcher,
+            $registry,
             $monitor,
             $repository,
             $siesaStateService,
@@ -102,6 +108,10 @@ class OrderMigrationControllerTest extends TestCase
         $dispatcher = Mockery::mock(WorkerTaskDispatchService::class);
         $dispatcher->shouldNotReceive('dispatch');
 
+        $registry = Mockery::mock(WorkerTaskDispatchRegistryService::class);
+        $registry->shouldReceive('findAccepted')->once()->with('order', '002-FC-24116')->andReturnNull();
+        $registry->shouldNotReceive('recordAcceptedForTask');
+
         $monitor = Mockery::mock(WorkerTaskMonitorService::class);
         $monitor->shouldNotReceive('createTask');
         $monitor->shouldNotReceive('markQueued');
@@ -124,6 +134,7 @@ class OrderMigrationControllerTest extends TestCase
         $controller = new OrderMigrationController(
             $resolver,
             $dispatcher,
+            $registry,
             $monitor,
             $repository,
             $siesaStateService,
@@ -145,5 +156,62 @@ class OrderMigrationControllerTest extends TestCase
         $payload = $response->getData(true);
         $this->assertFalse($payload['accepted']);
         $this->assertTrue($payload['siesa_state']['exists']);
+    }
+
+    public function test_it_returns_the_existing_accepted_dispatch_without_reenqueuing(): void
+    {
+        $resolver = Mockery::mock(WorkerTaskExecutionPlanResolver::class);
+        $resolver->shouldNotReceive('resolve');
+
+        $dispatcher = Mockery::mock(WorkerTaskDispatchService::class);
+        $dispatcher->shouldNotReceive('dispatch');
+
+        $registryRecord = new \App\Models\WorkerTaskDispatchRegistry([
+            'task_id' => 'existing-order-task',
+            'accepted_at' => now(),
+        ]);
+
+        $registry = Mockery::mock(WorkerTaskDispatchRegistryService::class);
+        $registry->shouldReceive('findAccepted')->once()->with('order', '002-FC-24116')->andReturn($registryRecord);
+        $registry->shouldNotReceive('recordAcceptedForTask');
+
+        $monitor = Mockery::mock(WorkerTaskMonitorService::class);
+        $monitor->shouldNotReceive('createTask');
+
+        $repository = Mockery::mock(OrderPrototypeRepository::class);
+        $repository->shouldNotReceive('findHeader');
+
+        $siesaStateService = Mockery::mock(OrderSiesaStateService::class);
+        $siesaStateService->shouldNotReceive('fetch');
+
+        $legacyState = Mockery::mock(OrderLegacyStateService::class);
+        $legacyState->shouldNotReceive('markDetectedInSiesa');
+
+        $controller = new OrderMigrationController(
+            $resolver,
+            $dispatcher,
+            $registry,
+            $monitor,
+            $repository,
+            $siesaStateService,
+            $legacyState
+        );
+
+        $request = Request::create('/api/order-migrations', 'POST', [
+            'document_id' => '002-FC-24116',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '002',
+            'document_type' => 'FC',
+            'document_number' => '24116',
+            'source' => 'api',
+        ]);
+
+        $response = $controller->store($request);
+
+        $this->assertSame(202, $response->getStatusCode());
+        $payload = $response->getData(true);
+        $this->assertTrue($payload['accepted']);
+        $this->assertTrue($payload['duplicate']);
+        $this->assertSame('existing-order-task', $payload['task_id']);
     }
 }

@@ -3,10 +3,10 @@
 namespace Tests\Feature;
 
 use App\Jobs\DispatchWorkerTaskJob;
-use App\Services\Kafka\KafkaMessageProducer;
 use App\Services\Workers\Receipts\ReceiptLegacyStateService;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
 use App\Services\Workers\Receipts\ReceiptSiesaStateService;
+use App\Services\Kafka\KafkaMessageProducer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Queue;
 use Mockery;
@@ -22,6 +22,24 @@ class ReceiptMigrationControllerTest extends TestCase
 
         config()->set('workerhub.kafka.publish_enabled', false);
         config()->set('workerhub.kafka.direct_dispatch_fallback', true);
+
+        $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('findHeader')->once()->andReturn((object) [
+            'F350_ID_CO' => '001',
+            'F350_ID_TIPO_DOCTO' => 'RX',
+            'F350_CONSEC_DOCTO' => '1001',
+        ]);
+        $this->app->instance(ReceiptPrototypeRepository::class, $repository);
+
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', false));
+        $this->app->instance(ReceiptSiesaStateService::class, $siesaStateService);
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldNotReceive('markDetectedInSiesa');
+        $this->app->instance(ReceiptLegacyStateService::class, $legacyState);
 
         $producer = Mockery::mock(KafkaMessageProducer::class);
         $producer->shouldReceive('publish')->once()->andReturn(false);
@@ -43,9 +61,11 @@ class ReceiptMigrationControllerTest extends TestCase
             'task_name' => 'Migracion recibo POS',
         ]);
 
+        $expectedQueue = (string) config('workerhub.processes.receipts.queues.default');
+
         $response->assertAccepted()
             ->assertJsonPath('dispatch_mode', 'direct_queue')
-            ->assertJsonPath('queue', config('workerhub.tasks.receipt_migration.queue'));
+            ->assertJsonPath('queue', $expectedQueue);
 
         $taskId = $response->json('task_id');
 
@@ -55,7 +75,7 @@ class ReceiptMigrationControllerTest extends TestCase
             'status' => 'queued',
             'source' => 'api',
             'kafka_key' => '001-RX-1001',
-            'queue' => config('workerhub.tasks.receipt_migration.queue'),
+            'queue' => $expectedQueue,
         ]);
 
         $this->assertDatabaseHas('worker_task_events', [

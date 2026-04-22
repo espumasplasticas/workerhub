@@ -38,6 +38,7 @@ use App\Services\Workers\Receipts\SqlReceiptCustomerSyncDataSource;
 use App\Services\Workers\Receipts\SqlReceiptPreMigrationDataSource;
 use App\Services\Workers\WorkerOperationLogService;
 use App\Services\Workers\WorkerTaskDispatchService;
+use App\Services\Workers\WorkerTaskDispatchRegistryService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskNotificationService;
 use App\Services\Workers\WorkerTaskReplayEligibilityService;
@@ -83,6 +84,7 @@ class AppServiceProvider extends ServiceProvider
         $this->app->singleton(ReceiptLegacyStateService::class);
         $this->app->singleton(ReceiptMigrationService::class);
         $this->app->singleton(WorkerTaskDispatchService::class);
+        $this->app->singleton(WorkerTaskDispatchRegistryService::class);
         $this->app->singleton(WorkerTaskNotificationService::class);
         $this->app->singleton(WorkerTaskMonitorService::class);
         $this->app->singleton(WorkerOperationLogService::class);

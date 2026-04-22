@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\ReceiptMigrationController;
 use App\Http\Controllers\Api\WorkerTaskLifecycleController;
 use App\Http\Controllers\Api\WorkerTaskMonitorController;
 use App\Http\Controllers\Api\WorkerTaskController;
+use App\Http\Controllers\Api\WorkerTaskDispatchRegistryController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
@@ -36,6 +37,7 @@ Route::post('/order-cancellations', [OrderCancellationController::class, 'store'
 Route::post('/receipt-migrations', [ReceiptMigrationController::class, 'store']);
 Route::post('/receipt-cancellations', [ReceiptCancellationController::class, 'store']);
 Route::post('/invoice-migrations', [InvoiceMigrationController::class, 'store']);
+Route::get('/internal/dispatch-registry/check', [WorkerTaskDispatchRegistryController::class, 'show']);
 Route::post('/internal/tasks/{taskId}/status', [WorkerTaskLifecycleController::class, 'update']);
 Route::middleware(['web', 'workerhub.operator'])->group(function () {
     Route::get('/monitor/tasks', [WorkerTaskMonitorController::class, 'index']);

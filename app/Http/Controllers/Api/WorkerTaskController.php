@@ -11,6 +11,7 @@ use App\Services\Workers\Receipts\ReceiptLegacyStateService;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
 use App\Services\Workers\Receipts\ReceiptSiesaStateService;
 use App\Services\Workers\WorkerTaskDispatchService;
+use App\Services\Workers\WorkerTaskDispatchRegistryService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Support\WorkerTaskExecutionPlanResolver;
 use Illuminate\Http\JsonResponse;
@@ -22,6 +23,7 @@ class WorkerTaskController extends Controller
     public function __construct(
         private readonly WorkerTaskExecutionPlanResolver $executionPlanResolver,
         private readonly WorkerTaskDispatchService $dispatcher,
+        private readonly WorkerTaskDispatchRegistryService $dispatchRegistry,
         private readonly WorkerTaskMonitorService $monitor,
         private readonly OrderPrototypeRepository $orderPrototypeRepository,
         private readonly OrderSiesaStateService $orderSiesaStateService,
@@ -47,6 +49,34 @@ class WorkerTaskController extends Controller
         $type = $validated['type'];
         $payload = $validated['payload'];
         $key = isset($payload['document_id']) ? (string) $payload['document_id'] : $taskId;
+
+        if ($type === 'order_migration' && isset($payload['document_id'])) {
+            $acceptedDispatch = $this->dispatchRegistry->findAccepted('order', (string) $payload['document_id']);
+
+            if ($acceptedDispatch !== null) {
+                return response()->json([
+                    'accepted' => true,
+                    'duplicate' => true,
+                    'task_id' => $acceptedDispatch->task_id,
+                    'key' => $key,
+                    'accepted_at' => $acceptedDispatch->accepted_at?->toIso8601String(),
+                ], 202);
+            }
+        }
+
+        if ($type === 'receipt_migration' && isset($payload['document_id'])) {
+            $acceptedDispatch = $this->dispatchRegistry->findAccepted('receipt', (string) $payload['document_id']);
+
+            if ($acceptedDispatch !== null) {
+                return response()->json([
+                    'accepted' => true,
+                    'duplicate' => true,
+                    'task_id' => $acceptedDispatch->task_id,
+                    'key' => $key,
+                    'accepted_at' => $acceptedDispatch->accepted_at?->toIso8601String(),
+                ], 202);
+            }
+        }
 
         if ($type === 'order_migration') {
             try {
@@ -125,6 +155,8 @@ class WorkerTaskController extends Controller
         } else {
             $this->monitor->markQueued($taskId, (string) $dispatch['queue']);
         }
+
+        $this->dispatchRegistry->recordAcceptedForTask($type, $payload, $taskId);
 
         return response()->json([
             'accepted' => true,
