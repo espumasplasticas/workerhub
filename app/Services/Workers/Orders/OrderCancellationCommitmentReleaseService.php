@@ -95,16 +95,25 @@ class OrderCancellationCommitmentReleaseService
         $rows = $connection->select(
             sprintf(
                 "SELECT
-                    f431_rowid,
-                    RTRIM(CONVERT(varchar(50), f431_id_item)) AS f431_id_item,
-                    RTRIM(ISNULL(f431_id_ext1_detalle, '')) AS f431_id_ext1_detalle,
-                    RTRIM(ISNULL(f431_id_bodega, '')) AS f431_id_bodega,
-                    RTRIM(ISNULL(f431_id_unidad_medida, '')) AS f431_id_unidad_medida,
-                    RTRIM(ISNULL(f431_id_ubicacion_aux, '')) AS f431_id_ubicacion_aux,
-                    f431_ind_estado
-                FROM %s
-                WHERE f431_rowid_pv_docto = ?",
-                $this->enterpriseOrderLinesTable()
+                    t431.f431_rowid,
+                    RTRIM(CONVERT(varchar(50), t120.f120_id)) AS f431_id_item,
+                    RTRIM(ISNULL(t121.f121_id_ext1_detalle, '')) AS f431_id_ext1_detalle,
+                    RTRIM(ISNULL(t150.f150_id, '')) AS f431_id_bodega,
+                    RTRIM(ISNULL(t120.f120_id_unidad_inventario, '')) AS f431_id_unidad_medida,
+                    CAST('' AS varchar(10)) AS f431_id_ubicacion_aux,
+                    t431.f431_ind_estado
+                FROM %s AS t431
+                INNER JOIN %s AS t121
+                    ON t431.f431_rowid_item_ext = t121.f121_rowid
+                INNER JOIN %s AS t120
+                    ON t121.f121_rowid_item = t120.f120_rowid
+                INNER JOIN %s AS t150
+                    ON t431.f431_rowid_bodega = t150.f150_rowid
+                WHERE t431.f431_rowid_pv_docto = ?",
+                $this->enterpriseOrderLinesTable(),
+                $this->enterpriseItemExtensionsTable(),
+                $this->enterpriseItemsTable(),
+                $this->enterpriseWarehousesTable()
             ),
             [$rowId]
         );
@@ -130,5 +139,20 @@ class OrderCancellationCommitmentReleaseService
     private function enterpriseOrderLinesTable(): string
     {
         return (string) $this->config->get('workerhub.orders.enterprise_state.tables.order_lines', 'SiesaEnterprise.dbo.t431_cm_pv_movto');
+    }
+
+    private function enterpriseItemsTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.items', 'SiesaEnterprise.dbo.t120_mc_items');
+    }
+
+    private function enterpriseItemExtensionsTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.item_extensions', 'SiesaEnterprise.dbo.t121_mc_items_extensiones');
+    }
+
+    private function enterpriseWarehousesTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.warehouses', 'SiesaEnterprise.dbo.t150_mc_bodegas');
     }
 }
