@@ -69,6 +69,60 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
         $this->assertTrue($result['siesa_state']['exists']);
     }
 
+    public function test_it_blocks_order_cancellation_replay_when_order_was_already_fulfilled_in_siesa(): void
+    {
+        $task = new WorkerTask([
+            'id' => 'task-order-cancel-1',
+            'type' => 'order_cancellation',
+            'status' => 'failed',
+            'payload' => [
+                'db_connection' => 'sqlsrv',
+                'operational_center' => '002',
+                'document_type' => 'FC',
+                'document_number' => '24116',
+            ],
+        ]);
+
+        $invoiceRepository = Mockery::mock(InvoicePrototypeRepository::class);
+        $invoiceRepository->shouldNotReceive('findHeader');
+
+        $invoiceSiesaStateService = Mockery::mock(InvoiceSiesaStateService::class);
+        $invoiceSiesaStateService->shouldNotReceive('fetch');
+
+        $orderRepository = Mockery::mock(OrderPrototypeRepository::class);
+        $orderRepository->shouldReceive('findHeader')->once()->andReturn((object) [
+            'f430_id_co' => '002',
+            'f430_id_tipo_docto' => 'PFC',
+            'f430_consec_docto' => '24116',
+        ]);
+
+        $orderSiesaStateService = Mockery::mock(OrderSiesaStateService::class);
+        $orderSiesaStateService->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new \App\Data\Orders\OrderSiesaStateSnapshot('002', 'FC', '24116', true, '002', 'PFC', '24116', 99, 120000.0, 4));
+
+        $receiptRepository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $receiptRepository->shouldNotReceive('findHeader');
+
+        $receiptSiesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $receiptSiesaStateService->shouldNotReceive('fetch');
+
+        $service = new WorkerTaskReplayEligibilityService(
+            $invoiceRepository,
+            $invoiceSiesaStateService,
+            $orderRepository,
+            $orderSiesaStateService,
+            $receiptRepository,
+            $receiptSiesaStateService
+        );
+
+        $result = $service->inspect($task);
+
+        $this->assertFalse($result['can_retry']);
+        $this->assertSame('El pedido ya esta cumplido en Siesa y no debe reencolarse.', $result['reason']);
+        $this->assertSame(4, $result['siesa_state']['state_indicator']);
+    }
+
     public function test_it_blocks_replay_when_receipt_already_exists_in_siesa(): void
     {
         $task = new WorkerTask([

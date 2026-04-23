@@ -3,6 +3,8 @@
 namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Services\Workers\Orders\OrderCancellationCommitmentReleaseService;
+use App\Services\Workers\Orders\OrderCancellationOperationalSideEffectsService;
 use App\Services\Workers\Orders\OrderLegacyStateService;
 use App\Services\Workers\Orders\OrderLineFactory;
 use App\Services\Workers\Orders\OrderPrototypeRepository;
@@ -16,7 +18,9 @@ class OrderCancellationService
         private readonly OrderPrototypeRepository $repository,
         private readonly OrderLineFactory $lineFactory,
         private readonly OrderSiesaStateService $siesaStateService,
-        private readonly OrderLegacyStateService $legacyStateService
+        private readonly OrderLegacyStateService $legacyStateService,
+        private readonly OrderCancellationCommitmentReleaseService $commitmentReleaseService,
+        private readonly OrderCancellationOperationalSideEffectsService $operationalSideEffectsService
     ) {
     }
 
@@ -42,8 +46,16 @@ class OrderCancellationService
             );
         }
 
+        if ((int) ($siesaStateBefore->stateIndicator ?? 0) === 4) {
+            throw new WorkerTaskProcessingException(
+                'No se puede anular el pedido porque en Siesa ya esta cumplido.',
+                ['payload' => $payload, 'siesa_state' => $siesaStateBefore->toArray()]
+            );
+        }
+
         if ((int) ($siesaStateBefore->stateIndicator ?? 0) === 9) {
             $measure('mark_cancelled_detected', fn () => $this->legacyStateService->markCancelled($payload, $siesaStateBefore));
+            $measure('apply_operational_side_effects_detected', fn () => $this->operationalSideEffectsService->applyPostCancellationSideEffects($payload, $siesaStateBefore));
 
             return [
                 'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
@@ -58,6 +70,7 @@ class OrderCancellationService
 
         $measure('validate_soap_configuration', fn () => $this->soapConfigurationValidator->validate());
         $measure('mark_cancellation_requested', fn () => $this->legacyStateService->markCancellationRequested($payload));
+        $releasedCommitmentLineCount = $measure('release_commitment', fn () => $this->commitmentReleaseService->releaseIfCommitted($payload, $siesaStateBefore));
         $lines = $measure('build_cancellation_lines', fn () => $this->lineFactory->buildCancellation($payload, $header, $orderRecord));
         $audit = $measure('audit_import', fn () => $this->auditService->import($lines, [
             'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
@@ -81,12 +94,14 @@ class OrderCancellationService
 
         $siesaStateAfter = $measure('fetch_siesa_state_after', fn () => $this->siesaStateService->fetch($payload, $header));
         $measure('mark_cancelled', fn () => $this->legacyStateService->markCancelled($payload, $siesaStateAfter));
+        $measure('apply_operational_side_effects', fn () => $this->operationalSideEffectsService->applyPostCancellationSideEffects($payload, $siesaStateAfter));
 
         return [
             'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
             'message' => $audit->result->message,
             'errors' => $audit->result->errors,
             'line_count' => count($lines),
+            'released_commitment_line_count' => $releasedCommitmentLineCount,
             'siesa_web_service' => $audit->log->toArray(),
             'siesa_state' => $siesaStateAfter->toArray(),
             'timings_ms' => $timings,

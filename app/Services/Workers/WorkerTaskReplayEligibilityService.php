@@ -74,6 +74,14 @@ class WorkerTaskReplayEligibilityService
 
                 $cancellationRequested = $task->type === 'order_cancellation';
 
+                if ($cancellationRequested && $siesaState->exists && (int) ($siesaState->stateIndicator ?? 0) === 4) {
+                    return [
+                        'can_retry' => false,
+                        'reason' => 'El pedido ya esta cumplido en Siesa y no debe reencolarse.',
+                        'siesa_state' => $siesaState->toArray(),
+                    ];
+                }
+
                 if ($siesaState->exists && (!$cancellationRequested || (int) ($siesaState->stateIndicator ?? 0) === 9)) {
                     return [
                         'can_retry' => false,

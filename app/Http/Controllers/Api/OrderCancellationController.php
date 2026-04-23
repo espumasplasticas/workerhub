@@ -86,6 +86,15 @@ class OrderCancellationController extends Controller
             ], 409);
         }
 
+        if ($siesaState->exists && (int) ($siesaState->stateIndicator ?? 0) === 4) {
+            return response()->json([
+                'accepted' => false,
+                'message' => 'El pedido ya esta cumplido en Siesa y no se puede anular.',
+                'document_id' => $validated['document_id'],
+                'siesa_state' => $siesaState->toArray(),
+            ], 409);
+        }
+
         $taskId = (string) Str::uuid();
         $message = [
             'task_id' => $taskId,

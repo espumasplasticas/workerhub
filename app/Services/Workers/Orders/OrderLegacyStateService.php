@@ -160,6 +160,10 @@ class OrderLegacyStateService
         $timestamp = Carbon::now();
         $updates = [
             'PE_IndicadorMigrado' => 1,
+            'PE_IndicadorSolicitadoManual' => 1,
+            'PE_IndicadorCumplidoManual' => 1,
+            'PE_IdUsuarioCumplioManual' => $this->serviceUserId(),
+            'PE_FechaCumplidoManual' => $timestamp->format('Y/m/d'),
             'PE_EstadoVerificadoExportacion' => 2,
             'PE_FechaVerificacionExportacion' => $timestamp,
             'PE_IndicadorAnulado' => 1,
