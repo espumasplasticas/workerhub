@@ -144,13 +144,17 @@ class OrderCancellationOperationalSideEffectsService
             return;
         }
 
-        $connection->table($this->productionTicketsTable())
-            ->where('FC_Pedido', $enterpriseOrderKey)
-            ->where('FC_Ot', 0)
-            ->update([
-                'FC_IndicadorAnulado' => 1,
-                'FC_Ot' => -6,
-            ]);
+        try {
+            $connection->table($this->productionTicketsTable())
+                ->where('FC_Pedido', $enterpriseOrderKey)
+                ->where('FC_Ot', 0)
+                ->update([
+                    'FC_IndicadorAnulado' => 1,
+                    'FC_Ot' => -6,
+                ]);
+        } catch (Throwable $exception) {
+            report($exception);
+        }
     }
 
     private function buildEnterpriseOrderKey(OrderSiesaStateSnapshot $snapshot): string
