@@ -16,7 +16,8 @@ class OrderCancellationOperationalSideEffectsService
     public function __construct(
         private readonly DatabaseManager $database,
         private readonly Repository $config,
-        private readonly SiesaImportAuditService $auditService
+        private readonly SiesaImportAuditService $auditService,
+        private readonly OrderDomicileBitacoraPreservationService $orderDomicileBitacoraPreservationService
     ) {
     }
 
@@ -30,6 +31,7 @@ class OrderCancellationOperationalSideEffectsService
         $connection = $this->connectionFor(trim((string) ($payload['db_connection'] ?? '')));
 
         $this->cancelAssemblyInventoryDocumentIfPresent($connection, $payload, $snapshot);
+        $this->orderDomicileBitacoraPreservationService->preserveDomicileBitacorasAsOrderNotes($payload, $snapshot);
         $this->completeLinkedDomicileIfPresent($connection, $snapshot);
         $this->cancelProductionTicketsIfPresent($connection, $snapshot);
     }

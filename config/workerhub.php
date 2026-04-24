@@ -247,6 +247,8 @@ return [
             'domicile_orders' => env('WORKERHUB_ORDER_DOMICILE_ORDERS_TABLE', 'logistica.domicilios_pedido_encabezado'),
             'domicile_order_details' => env('WORKERHUB_ORDER_DOMICILE_ORDER_DETAILS_TABLE', 'logistica.domicilios_pedido_detalle'),
             'movement_logs' => env('WORKERHUB_ORDER_MOVEMENT_LOGS_TABLE', 'aplicacion.bitacora_movimientos'),
+            'intranet_users' => env('WORKERHUB_ORDER_INTRANET_USERS_TABLE', 'aplicacion.intranet_usuarios'),
+            'order_notes' => env('WORKERHUB_ORDER_NOTES_TABLE', 'pos.notas_pedidos'),
             'next_numbers' => env('WORKERHUB_ORDER_NEXT_NUMBERS_TABLE', 'aplicacion.numerosiguiente'),
             'dispatch_requests' => env('WORKERHUB_ORDER_DISPATCH_REQUESTS_TABLE', 'pos.solicitud_despacho_correos'),
             'sales_information' => env('WORKERHUB_ORDER_SALES_INFORMATION_TABLE', 'pos.salas_informacion_adicional'),
