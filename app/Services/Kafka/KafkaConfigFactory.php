@@ -22,7 +22,10 @@ class KafkaConfigFactory
         return $config;
     }
 
-    public function makeConsumerConfig(string $topic): ConsumerConfig
+    /**
+     * @param string|array<int, string> $topic
+     */
+    public function makeConsumerConfig(string|array $topic): ConsumerConfig
     {
         $config = new ConsumerConfig();
         $config->setClientId((string) config('workerhub.kafka.client_id'));

@@ -22,9 +22,9 @@ class WorkerTaskConsumer
 
     public function consumeRequests(): void
     {
-        $topic = (string) config('workerhub.kafka.topics.requests');
+        $topics = $this->resolveRequestTopics();
         $consumer = new Consumer(
-            $this->configFactory->makeConsumerConfig($topic),
+            $this->configFactory->makeConsumerConfig($topics),
             function (ConsumeMessage $message): void {
                 $this->handleMessage($message);
             }
@@ -153,5 +153,34 @@ class WorkerTaskConsumer
 
             $message->getConsumer()->ack($message);
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveRequestTopics(): array
+    {
+        $topics = [];
+        $defaultTopic = trim((string) config('workerhub.kafka.topics.requests', ''));
+
+        if ($defaultTopic !== '') {
+            $topics[] = $defaultTopic;
+        }
+
+        foreach ((array) config('workerhub.processes', []) as $processDefinition) {
+            $requestTopic = trim((string) data_get($processDefinition, 'topics.requests', ''));
+
+            if ($requestTopic !== '') {
+                $topics[] = $requestTopic;
+            }
+        }
+
+        $topics = array_values(array_unique($topics));
+
+        if ($topics === []) {
+            $topics[] = 'workerhub.tasks.requests';
+        }
+
+        return $topics;
     }
 }

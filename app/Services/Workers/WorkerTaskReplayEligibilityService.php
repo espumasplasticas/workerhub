@@ -5,6 +5,7 @@ namespace App\Services\Workers;
 use App\Models\WorkerTask;
 use App\Services\Workers\Invoices\InvoicePrototypeRepository;
 use App\Services\Workers\Invoices\InvoiceSiesaStateService;
+use App\Services\Workers\Orders\OrderDeliveryGenerationRepository;
 use App\Services\Workers\Orders\OrderPrototypeRepository;
 use App\Services\Workers\Orders\OrderSiesaStateService;
 use App\Services\Workers\Receipts\ReceiptPrototypeRepository;
@@ -16,6 +17,7 @@ class WorkerTaskReplayEligibilityService
     public function __construct(
         private readonly InvoicePrototypeRepository $invoicePrototypeRepository,
         private readonly InvoiceSiesaStateService $invoiceSiesaStateService,
+        private readonly OrderDeliveryGenerationRepository $orderDeliveryGenerationRepository,
         private readonly OrderPrototypeRepository $orderPrototypeRepository,
         private readonly OrderSiesaStateService $orderSiesaStateService,
         private readonly ReceiptPrototypeRepository $receiptPrototypeRepository,
@@ -60,6 +62,46 @@ class WorkerTaskReplayEligibilityService
                 return [
                     'can_retry' => false,
                     'reason' => 'No se pudo validar si la factura ya existe en Siesa: ' . $exception->getMessage(),
+                    'siesa_state' => null,
+                ];
+            }
+        }
+
+        if ($task->type === 'order_delivery_generation') {
+            $payload = is_array($task->payload) ? $task->payload : [];
+
+            try {
+                $orderRecord = $this->orderPrototypeRepository->findOrderRecord($payload);
+                $header = $this->orderPrototypeRepository->findHeader($payload);
+                $siesaState = $this->orderSiesaStateService->fetch($payload, $header);
+
+                if (!$this->orderDeliveryGenerationRepository->shouldGenerateDomicile($orderRecord)) {
+                    return [
+                        'can_retry' => false,
+                        'reason' => 'El pedido ya no cumple las condiciones legacy para generar domicilio.',
+                        'siesa_state' => $siesaState->toArray(),
+                    ];
+                }
+
+                $existingDomicile = $this->orderDeliveryGenerationRepository->findActiveDomicileForEnterpriseOrder($payload, $siesaState);
+
+                if ($existingDomicile !== null) {
+                    return [
+                        'can_retry' => false,
+                        'reason' => 'El pedido ya tiene un domicilio activo y no debe reencolarse.',
+                        'siesa_state' => $siesaState->toArray(),
+                    ];
+                }
+
+                return [
+                    'can_retry' => true,
+                    'reason' => null,
+                    'siesa_state' => $siesaState->toArray(),
+                ];
+            } catch (Throwable $exception) {
+                return [
+                    'can_retry' => false,
+                    'reason' => 'No se pudo validar si el pedido ya tiene domicilio: ' . $exception->getMessage(),
                     'siesa_state' => null,
                 ];
             }

@@ -253,6 +253,18 @@ class OrderLegacyStateService
         ]);
     }
 
+    public function updateLinkedDomicileReference(array $payload, string $domicileType, int $domicileNumber): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $this->orderQuery($payload)->update([
+            'PE_DomicilioTipo' => trim($domicileType),
+            'PE_DomicilioNumero' => $domicileNumber,
+        ]);
+    }
+
     public function computeLegacyNetTotal(array $payload): float
     {
         $reference = $this->resolveReference($payload);

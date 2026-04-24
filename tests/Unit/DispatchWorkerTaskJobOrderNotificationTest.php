@@ -8,6 +8,7 @@ use App\Services\Integrations\Api\OrderCancellationNotificationClient;
 use App\Services\Integrations\Api\OrderMigrationNotificationClient;
 use App\Services\Integrations\Api\ReceiptCancellationNotificationClient;
 use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
+use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
 use Mockery;
@@ -35,6 +36,10 @@ class DispatchWorkerTaskJobOrderNotificationTest extends TestCase
                 'document_id' => '002-FC-24116',
                 'message' => 'Pedido importado',
             ]);
+        $router->shouldNotReceive('resolveExecutionPlan');
+
+        $dispatcher = Mockery::mock(WorkerTaskDispatchService::class);
+        $dispatcher->shouldNotReceive('dispatch');
 
         $monitor = Mockery::mock(WorkerTaskMonitorService::class);
         $monitor->shouldReceive('markProcessing')->once()->with('task-order-notify', 1);
@@ -66,6 +71,7 @@ class DispatchWorkerTaskJobOrderNotificationTest extends TestCase
         $job = new DispatchWorkerTaskJob($task);
         $job->handle(
             $router,
+            $dispatcher,
             $monitor,
             $invoiceNotificationClient,
             $orderCancellationNotificationClient,

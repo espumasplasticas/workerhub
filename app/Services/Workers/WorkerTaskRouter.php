@@ -13,6 +13,7 @@ class WorkerTaskRouter
         private readonly DocumentMigrationService $documentMigrationService,
         private readonly InvoiceMigrationService $invoiceMigrationService,
         private readonly OrderCancellationService $orderCancellationService,
+        private readonly OrderDeliveryGenerationService $orderDeliveryGenerationService,
         private readonly OrderMigrationService $orderMigrationService,
         private readonly ReceiptCancellationService $receiptCancellationService,
         private readonly ReceiptMigrationService $receiptMigrationService
@@ -59,6 +60,7 @@ class WorkerTaskRouter
             'document_migration' => $this->documentMigrationService->handle($payload),
             'invoice_migration' => $this->invoiceMigrationService->handle($payload),
             'order_cancellation' => $this->orderCancellationService->handle($payload),
+            'order_delivery_generation' => $this->orderDeliveryGenerationService->handle($payload),
             'order_migration' => $this->orderMigrationService->handle($payload),
             'receipt_cancellation' => $this->receiptCancellationService->handle($payload),
             'receipt_migration' => $this->receiptMigrationService->handle($payload),

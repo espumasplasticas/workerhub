@@ -58,15 +58,12 @@ class WorkerTaskExecutionPlanResolver
 
     private function fallbackTaskQueue(string $type, bool $highPriority): string
     {
-        if ($type === 'document_migration' || $type === 'receipt_migration') {
-            $configKey = $highPriority ? 'high_priority_queue' : 'queue';
-
-            return (string) $this->config->get("workerhub.tasks.$type.$configKey", $this->config->get('workerhub.queues.default'));
-        }
-
-        return (string) ($highPriority
+        $configKey = $highPriority ? 'high_priority_queue' : 'queue';
+        $defaultQueue = $highPriority
             ? $this->config->get('workerhub.queues.high_priority')
-            : $this->config->get('workerhub.queues.default'));
+            : $this->config->get('workerhub.queues.default');
+
+        return (string) $this->config->get("workerhub.tasks.$type.$configKey", $defaultQueue);
     }
 
     private function fallbackExecutionTopic(string $processKey, string $runtime): string

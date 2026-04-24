@@ -7,6 +7,8 @@ use App\Services\Integrations\Api\OrderCancellationNotificationClient;
 use App\Services\Integrations\Api\OrderMigrationNotificationClient;
 use App\Services\Integrations\Api\ReceiptCancellationNotificationClient;
 use App\Services\Integrations\Api\ReceiptMigrationNotificationClient;
+use App\Models\WorkerTask;
+use App\Services\Workers\WorkerTaskDispatchService;
 use App\Services\Workers\WorkerTaskMonitorService;
 use App\Services\Workers\WorkerTaskRouter;
 use Illuminate\Bus\Queueable;
@@ -15,6 +17,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Str;
 use Throwable;
 
 class DispatchWorkerTaskJob implements ShouldQueue
@@ -28,6 +31,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
 
     public function handle(
         WorkerTaskRouter $taskRouter,
+        WorkerTaskDispatchService $dispatcher,
         WorkerTaskMonitorService $monitor,
         InvoiceMigrationNotificationClient $invoiceNotificationClient,
         OrderCancellationNotificationClient $orderCancellationNotificationClient,
@@ -44,6 +48,7 @@ class DispatchWorkerTaskJob implements ShouldQueue
 
             $this->task['result'] = $result;
             $monitor->markCompleted($taskId, $result);
+            $this->enqueueOrderDeliveryGenerationIfNeeded($taskRouter, $dispatcher, $monitor, $taskId);
             $this->notifyInvoiceMigrationIfNeeded($invoiceNotificationClient, $monitor, $taskId);
             $this->notifyOrderCancellationIfNeeded($orderCancellationNotificationClient, $monitor, $taskId);
             $this->notifyOrderMigrationIfNeeded($orderNotificationClient, $monitor, $taskId);
@@ -292,6 +297,110 @@ class DispatchWorkerTaskJob implements ShouldQueue
                 'created_by_user_id' => (int) $createdByUserId,
             ]
         );
+    }
+
+    private function enqueueOrderDeliveryGenerationIfNeeded(
+        WorkerTaskRouter $taskRouter,
+        WorkerTaskDispatchService $dispatcher,
+        WorkerTaskMonitorService $monitor,
+        string $taskId
+    ): void {
+        if (($this->task['type'] ?? null) !== 'order_migration') {
+            return;
+        }
+
+        if (!Arr::get($this->task, 'result.siesa_state.exists', false)) {
+            return;
+        }
+
+        if (WorkerTask::query()
+            ->where('parent_task_id', $taskId)
+            ->where('type', 'order_delivery_generation')
+            ->exists()) {
+            return;
+        }
+
+        $payload = Arr::get($this->task, 'payload', []);
+
+        if (!is_array($payload)) {
+            return;
+        }
+
+        $documentId = trim((string) ($payload['document_id'] ?? ''));
+
+        if ($documentId === '') {
+            return;
+        }
+
+        $metadata = Arr::get($payload, 'metadata', []);
+        $metadata = is_array($metadata) ? $metadata : [];
+        $followUpPayload = array_merge($payload, [
+            'metadata' => array_merge($metadata, [
+                'process_key' => 'deliveries',
+                'process_label' => 'Domicilios',
+                'task_name' => 'Generacion domicilio pedido',
+                'generated_from_task_id' => $taskId,
+                'generated_from_task_type' => 'order_migration',
+            ]),
+        ]);
+
+        $followUpTaskId = (string) Str::uuid();
+        $followUpTask = [
+            'task_id' => $followUpTaskId,
+            'parent_task_id' => $taskId,
+            'type' => 'order_delivery_generation',
+            'priority' => $this->task['priority'] ?? 'default',
+            'headers' => [],
+            'payload' => $followUpPayload,
+            'submitted_at' => now()->toIso8601String(),
+        ];
+
+        try {
+            $executionPlan = $taskRouter->resolveExecutionPlan($followUpTask);
+            $requestTopic = (string) ($executionPlan['request_topic'] ?? config('workerhub.kafka.topics.requests'));
+
+            $monitor->createTask($followUpTask, $requestTopic, $documentId);
+
+            $dispatch = $dispatcher->dispatch(
+                $requestTopic,
+                $followUpTask,
+                $documentId,
+                [
+                    'workerhub-parent-task-id' => $taskId,
+                    'workerhub-origin-task-type' => 'order_migration',
+                ]
+            );
+
+            if ($dispatch['mode'] === 'kafka') {
+                $monitor->markPublished($followUpTaskId);
+            } else {
+                $monitor->markQueued($followUpTaskId, (string) $dispatch['queue']);
+            }
+
+            $monitor->addEvent(
+                $taskId,
+                'task.follow_up.order_delivery_generation',
+                'Order delivery generation task enqueued after successful order migration.',
+                [
+                    'child_task_id' => $followUpTaskId,
+                    'document_id' => $documentId,
+                    'dispatch_mode' => $dispatch['mode'],
+                    'queue' => $dispatch['queue'],
+                    'topic' => $requestTopic,
+                ]
+            );
+        } catch (Throwable $exception) {
+            $monitor->addEvent(
+                $taskId,
+                'task.follow_up.order_delivery_generation_failed',
+                'Order delivery generation follow-up could not be enqueued.',
+                [
+                    'document_id' => $documentId,
+                    'error' => $exception->getMessage(),
+                ],
+                'warning'
+            );
+        }
     }
 
     private function reportFailure(
