@@ -80,6 +80,7 @@ return [
         'consumer_session_timeout' => (float) env('KAFKA_CONSUMER_SESSION_TIMEOUT', 60),
         'consumer_rebalance_timeout' => (float) env('KAFKA_CONSUMER_REBALANCE_TIMEOUT', 60),
         'consumer_heartbeat' => (float) env('KAFKA_CONSUMER_HEARTBEAT', 3),
+        'consume_all_process_topics' => filter_var(env('WORKERHUB_KAFKA_CONSUME_ALL_PROCESS_TOPICS', false), FILTER_VALIDATE_BOOL),
         'topics' => [
             'requests' => env('KAFKA_TOPIC_REQUESTS', 'workerhub.tasks.requests'),
             'results' => env('KAFKA_TOPIC_RESULTS', 'workerhub.tasks.results'),

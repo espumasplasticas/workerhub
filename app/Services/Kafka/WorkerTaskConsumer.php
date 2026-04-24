@@ -161,17 +161,19 @@ class WorkerTaskConsumer
     private function resolveRequestTopics(): array
     {
         $topics = [];
-        $defaultTopic = trim((string) config('workerhub.kafka.topics.requests', ''));
+        $configuredRequestTopic = trim((string) config('workerhub.kafka.topics.requests', ''));
 
-        if ($defaultTopic !== '') {
-            $topics[] = $defaultTopic;
+        if ($configuredRequestTopic !== '') {
+            $topics[] = $configuredRequestTopic;
         }
 
-        foreach ((array) config('workerhub.processes', []) as $processDefinition) {
-            $requestTopic = trim((string) data_get($processDefinition, 'topics.requests', ''));
+        if ((bool) config('workerhub.kafka.consume_all_process_topics', false)) {
+            foreach ((array) config('workerhub.processes', []) as $processDefinition) {
+                $requestTopic = trim((string) data_get($processDefinition, 'topics.requests', ''));
 
-            if ($requestTopic !== '') {
-                $topics[] = $requestTopic;
+                if ($requestTopic !== '') {
+                    $topics[] = $requestTopic;
+                }
             }
         }
 
