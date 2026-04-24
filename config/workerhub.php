@@ -53,7 +53,7 @@ return [
         'order_delivery_generation' => [
             'queue' => env('WORKERHUB_ORDER_DELIVERY_GENERATION_QUEUE', env('WORKERHUB_DELIVERIES_QUEUE', 'deliveries-default')),
             'high_priority_queue' => env('WORKERHUB_ORDER_DELIVERY_GENERATION_HIGH_QUEUE', env('WORKERHUB_DELIVERIES_HIGH_QUEUE', 'deliveries-high')),
-            'tries' => (int) env('WORKERHUB_ORDER_DELIVERY_GENERATION_TRIES', 3),
+            'tries' => (int) env('WORKERHUB_ORDER_DELIVERY_GENERATION_TRIES', 6),
             'timeout' => (int) env('WORKERHUB_ORDER_DELIVERY_GENERATION_TIMEOUT', 300),
         ],
         'invoice_migration' => [
@@ -373,7 +373,7 @@ return [
                 'requests' => env('KAFKA_TOPIC_DELIVERIES_REQUESTS', 'workerhub.tasks.requests.deliveries'),
                 'execution' => env('KAFKA_TOPIC_DELIVERIES_EXECUTION', 'workerhub.runtime.php.deliveries'),
             ],
-            'tries' => (int) env('WORKERHUB_DELIVERIES_TRIES', env('WORKERHUB_ORDER_DELIVERY_GENERATION_TRIES', 3)),
+            'tries' => (int) env('WORKERHUB_DELIVERIES_TRIES', env('WORKERHUB_ORDER_DELIVERY_GENERATION_TRIES', 6)),
             'timeout' => (int) env('WORKERHUB_DELIVERIES_TIMEOUT', env('WORKERHUB_ORDER_DELIVERY_GENERATION_TIMEOUT', 300)),
         ],
         'invoices' => [

@@ -60,6 +60,21 @@ class DispatchWorkerTaskJob implements ShouldQueue
         }
     }
 
+    /**
+     * Define un backoff explicito para los follow-ups que dependen de cambios de estado
+     * posteriores en Siesa, como la generacion de domicilios.
+     *
+     * @return list<int>|int
+     */
+    public function backoff(): array|int
+    {
+        if (($this->task['type'] ?? null) === 'order_delivery_generation') {
+            return [60, 180, 300, 600, 900];
+        }
+
+        return 0;
+    }
+
     private function resolveQueueName(): string
     {
         return (string) ($this->task['queue'] ?? config('queue.default', 'default'));

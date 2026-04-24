@@ -3,6 +3,7 @@
 namespace App\Services\Workers;
 
 use App\Data\Orders\OrderSiesaStateSnapshot;
+use App\Exceptions\WorkerTaskProcessingException;
 use App\Services\Workers\Orders\OrderDeliveryGenerationRepository;
 use App\Services\Workers\Orders\OrderLegacyStateService;
 use App\Services\Workers\Orders\OrderPrototypeRepository;
@@ -44,7 +45,27 @@ class OrderDeliveryGenerationService
         $header = $this->orderPrototypeRepository->findHeader($payload);
         $siesaState = $this->orderSiesaStateService->fetch($payload, $header);
 
-        if (!$siesaState->exists || in_array((int) ($siesaState->stateIndicator ?? 0), [0, 4, 9], true)) {
+        if (!$siesaState->exists) {
+            return [
+                'document_id' => $documentId,
+                'message' => 'El pedido no existe en Siesa y no se puede generar el domicilio.',
+                'status' => 'skipped',
+                'siesa_state' => $siesaState->toArray(),
+                'domicile' => null,
+            ];
+        }
+
+        if ((int) ($siesaState->stateIndicator ?? 0) === 0) {
+            throw new WorkerTaskProcessingException(
+                'El pedido aun esta en estado 0 en Siesa. Se reintentara la generacion del domicilio.',
+                [
+                    'document_id' => $documentId,
+                    'siesa_state' => $siesaState->toArray(),
+                ]
+            );
+        }
+
+        if (in_array((int) ($siesaState->stateIndicator ?? 0), [4, 9], true)) {
             return [
                 'document_id' => $documentId,
                 'message' => 'El pedido no esta en un estado valido de Siesa para generar domicilio.',
