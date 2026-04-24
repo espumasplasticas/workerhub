@@ -37,6 +37,59 @@ class ReceiptPrototypeRepository
     }
 
     /**
+     * Completa el payload de migracion del recibo usando el rowid como fuente de verdad.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function hydratePayloadFromReceiptId(array $payload): array
+    {
+        $dbConnection = trim((string) ($payload['db_connection'] ?? ''));
+        $receiptId = $payload['receipt_id'] ?? null;
+
+        if ($dbConnection === '' || !is_numeric($receiptId)) {
+            throw new WorkerTaskProcessingException(
+                'El payload de receipt_migration requiere db_connection y receipt_id para resolver el recibo.',
+                ['payload' => $payload]
+            );
+        }
+
+        $record = $this->connectionFor($dbConnection)
+            ->table($this->sourceReceiptTable())
+            ->select([
+                'RE_rowid',
+                'RE_CentroOperativo',
+                'RE_TipoDocumento',
+                'RE_NumeroDocumento',
+                'RE_CodigoTercero',
+                'RE_CodigoSucursal',
+            ])
+            ->where('RE_rowid', (int) $receiptId)
+            ->first();
+
+        if (!$record instanceof stdClass) {
+            throw new WorkerTaskProcessingException(
+                'No se encontro el recibo origen para el rowid enviado a WorkerHub.',
+                ['payload' => $payload, 'receipt_id' => (int) $receiptId]
+            );
+        }
+
+        $operationalCenter = trim((string) ($record->RE_CentroOperativo ?? ''));
+        $documentType = trim((string) ($record->RE_TipoDocumento ?? ''));
+        $documentNumber = trim((string) ($record->RE_NumeroDocumento ?? ''));
+
+        return array_merge($payload, [
+            'receipt_id' => (int) ($record->RE_rowid ?? $receiptId),
+            'document_id' => sprintf('%s-%s-%s', $operationalCenter, $documentType, $documentNumber),
+            'operational_center' => $operationalCenter,
+            'document_type' => $documentType,
+            'document_number' => $documentNumber,
+            'client_code' => trim((string) ($record->RE_CodigoTercero ?? ($payload['client_code'] ?? ''))),
+            'client_branch' => trim((string) ($record->RE_CodigoSucursal ?? ($payload['client_branch'] ?? ''))),
+        ]);
+    }
+
+    /**
      * @return list<stdClass>
      */
     public function findPayments(array $payload): array
@@ -131,5 +184,10 @@ class ReceiptPrototypeRepository
     private function paymentsView(): string
     {
         return (string) $this->config->get('workerhub.receipts.views.payments');
+    }
+
+    private function sourceReceiptTable(): string
+    {
+        return (string) $this->config->get('workerhub.receipts.pre_migration.table', 'pos.recibos_encabezado');
     }
 }

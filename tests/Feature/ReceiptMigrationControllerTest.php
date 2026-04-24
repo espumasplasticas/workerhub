@@ -24,6 +24,23 @@ class ReceiptMigrationControllerTest extends TestCase
         config()->set('workerhub.kafka.direct_dispatch_fallback', true);
 
         $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('hydratePayloadFromReceiptId')->once()->andReturn([
+            'receipt_id' => 123,
+            'document_id' => '001-RX-1001',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'RX',
+            'document_number' => '1001',
+            'company_id' => 1,
+            'client_code' => '900123',
+            'source' => 'api',
+            'metadata' => [
+                'process_key' => 'receipts',
+                'process_label' => 'Recibos',
+                'schedule_name' => 'API_RECEIPT_CREATED',
+                'task_name' => 'Migracion recibo POS',
+            ],
+        ]);
         $repository->shouldReceive('findHeader')->once()->andReturn((object) [
             'F350_ID_CO' => '001',
             'F350_ID_TIPO_DOCTO' => 'RX',
@@ -47,13 +64,8 @@ class ReceiptMigrationControllerTest extends TestCase
 
         $response = $this->postJson('/api/receipt-migrations', [
             'receipt_id' => 123,
-            'document_id' => '001-RX-1001',
             'db_connection' => 'sqlsrv',
-            'operational_center' => '001',
-            'document_type' => 'RX',
-            'document_number' => '1001',
             'company_id' => 1,
-            'client_code' => '900123',
             'source' => 'api',
             'process_key' => 'receipts',
             'process_label' => 'Recibos',
@@ -91,6 +103,15 @@ class ReceiptMigrationControllerTest extends TestCase
         Queue::fake();
 
         $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('hydratePayloadFromReceiptId')->once()->andReturn([
+            'receipt_id' => 123,
+            'document_id' => '001-RX-1001',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'RX',
+            'document_number' => '1001',
+            'source' => 'api',
+        ]);
         $repository->shouldReceive('findHeader')->once()->andReturn((object) [
             'F350_ID_CO' => '001',
             'F350_ID_TIPO_DOCTO' => 'RX',
@@ -109,11 +130,8 @@ class ReceiptMigrationControllerTest extends TestCase
         $this->app->instance(ReceiptLegacyStateService::class, $legacyState);
 
         $response = $this->postJson('/api/receipt-migrations', [
-            'document_id' => '001-RX-1001',
+            'receipt_id' => 123,
             'db_connection' => 'sqlsrv',
-            'operational_center' => '001',
-            'document_type' => 'RX',
-            'document_number' => '1001',
             'source' => 'api',
         ]);
 

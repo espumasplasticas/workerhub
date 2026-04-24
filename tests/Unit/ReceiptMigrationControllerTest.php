@@ -38,6 +38,15 @@ class ReceiptMigrationControllerTest extends TestCase
         $monitor->shouldNotReceive('createTask');
 
         $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('hydratePayloadFromReceiptId')->once()->andReturn([
+            'receipt_id' => 123,
+            'document_id' => '001-RX-1001',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'RX',
+            'document_number' => '1001',
+            'source' => 'api',
+        ]);
         $repository->shouldNotReceive('findHeader');
 
         $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
@@ -57,11 +66,9 @@ class ReceiptMigrationControllerTest extends TestCase
         );
 
         $request = Request::create('/api/receipt-migrations', 'POST', [
+            'receipt_id' => 123,
             'document_id' => '001-RX-1001',
             'db_connection' => 'sqlsrv',
-            'operational_center' => '001',
-            'document_type' => 'RX',
-            'document_number' => '1001',
             'source' => 'api',
         ]);
 

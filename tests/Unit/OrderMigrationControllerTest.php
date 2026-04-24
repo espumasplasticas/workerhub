@@ -47,6 +47,24 @@ class OrderMigrationControllerTest extends TestCase
         $monitor->shouldReceive('markQueued')->once()->with('11111111-1111-1111-1111-111111111111', 'sales-orders-default');
 
         $repository = Mockery::mock(OrderPrototypeRepository::class);
+        $repository->shouldReceive('hydratePayloadFromOrderId')->once()->andReturn([
+            'order_id' => 1411395,
+            'document_id' => '002-FC-24116',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '002',
+            'document_type' => 'FC',
+            'document_number' => '24116',
+            'company_id' => 2,
+            'client_code' => '900123',
+            'client_branch' => '001',
+            'source' => 'api',
+            'metadata' => [
+                'process_key' => 'sales_orders',
+                'process_label' => 'Pedidos',
+                'schedule_name' => 'API_ORDER_CREATED',
+                'task_name' => 'Migracion pedido POS',
+            ],
+        ]);
         $repository->shouldReceive('findHeader')->once()->andReturn((object) [
             'f430_id_co' => '002',
             'f430_id_tipo_docto' => 'PFC',
@@ -73,14 +91,8 @@ class OrderMigrationControllerTest extends TestCase
 
         $request = Request::create('/api/order-migrations', 'POST', [
             'order_id' => 1411395,
-            'document_id' => '002-FC-24116',
             'db_connection' => 'sqlsrv',
-            'operational_center' => '002',
-            'document_type' => 'FC',
-            'document_number' => '24116',
             'company_id' => 2,
-            'client_code' => '900123',
-            'client_branch' => '001',
             'source' => 'api',
             'process_key' => 'sales_orders',
             'process_label' => 'Pedidos',
@@ -117,6 +129,15 @@ class OrderMigrationControllerTest extends TestCase
         $monitor->shouldNotReceive('markQueued');
 
         $repository = Mockery::mock(OrderPrototypeRepository::class);
+        $repository->shouldReceive('hydratePayloadFromOrderId')->once()->andReturn([
+            'order_id' => 1411395,
+            'document_id' => '002-FC-24116',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '002',
+            'document_type' => 'FC',
+            'document_number' => '24116',
+            'source' => 'api',
+        ]);
         $repository->shouldReceive('findHeader')->once()->andReturn((object) [
             'f430_id_co' => '002',
             'f430_id_tipo_docto' => 'PFC',
@@ -142,11 +163,8 @@ class OrderMigrationControllerTest extends TestCase
         );
 
         $request = Request::create('/api/order-migrations', 'POST', [
-            'document_id' => '002-FC-24116',
+            'order_id' => 1411395,
             'db_connection' => 'sqlsrv',
-            'operational_center' => '002',
-            'document_type' => 'FC',
-            'document_number' => '24116',
             'source' => 'api',
         ]);
 
@@ -179,6 +197,15 @@ class OrderMigrationControllerTest extends TestCase
         $monitor->shouldNotReceive('createTask');
 
         $repository = Mockery::mock(OrderPrototypeRepository::class);
+        $repository->shouldReceive('hydratePayloadFromOrderId')->once()->andReturn([
+            'order_id' => 1411395,
+            'document_id' => '002-FC-24116',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '002',
+            'document_type' => 'FC',
+            'document_number' => '24116',
+            'source' => 'api',
+        ]);
         $repository->shouldNotReceive('findHeader');
 
         $siesaStateService = Mockery::mock(OrderSiesaStateService::class);
@@ -198,11 +225,8 @@ class OrderMigrationControllerTest extends TestCase
         );
 
         $request = Request::create('/api/order-migrations', 'POST', [
-            'document_id' => '002-FC-24116',
+            'order_id' => 1411395,
             'db_connection' => 'sqlsrv',
-            'operational_center' => '002',
-            'document_type' => 'FC',
-            'document_number' => '24116',
             'source' => 'api',
         ]);
 

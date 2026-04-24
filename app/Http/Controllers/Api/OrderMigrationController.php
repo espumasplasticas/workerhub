@@ -32,11 +32,11 @@ class OrderMigrationController extends Controller
     {
         $validated = $request->validate([
             'order_id' => ['nullable', 'integer'],
-            'document_id' => ['required', 'string'],
+            'document_id' => ['nullable', 'string'],
             'db_connection' => ['required', 'string'],
-            'operational_center' => ['required', 'string'],
-            'document_type' => ['required', 'string'],
-            'document_number' => ['required'],
+            'operational_center' => ['nullable', 'string'],
+            'document_type' => ['nullable', 'string'],
+            'document_number' => ['nullable'],
             'company_id' => ['nullable', 'integer'],
             'client_code' => ['nullable', 'string'],
             'client_branch' => ['nullable', 'string'],
@@ -60,17 +60,27 @@ class OrderMigrationController extends Controller
 
         $payload = [
             'order_id' => $validated['order_id'] ?? null,
-            'document_id' => $validated['document_id'],
+            'document_id' => $validated['document_id'] ?? null,
             'db_connection' => $validated['db_connection'],
-            'operational_center' => trim((string) $validated['operational_center']),
-            'document_type' => trim((string) $validated['document_type']),
-            'document_number' => trim((string) $validated['document_number']),
+            'operational_center' => trim((string) ($validated['operational_center'] ?? '')),
+            'document_type' => trim((string) ($validated['document_type'] ?? '')),
+            'document_number' => trim((string) ($validated['document_number'] ?? '')),
             'company_id' => $validated['company_id'] ?? null,
             'client_code' => $validated['client_code'] ?? null,
             'client_branch' => $validated['client_branch'] ?? null,
             'source' => $validated['source'] ?? 'api',
             'metadata' => $metadata,
         ];
+
+        try {
+            $payload = $this->resolveOrderMigrationPayload($payload);
+        } catch (WorkerTaskProcessingException $exception) {
+            return response()->json([
+                'accepted' => false,
+                'message' => $exception->getMessage(),
+                'context' => $exception->context(),
+            ], 422);
+        }
 
         $acceptedDispatch = $this->dispatchRegistry->findAccepted('order', $payload['document_id']);
 
@@ -79,7 +89,7 @@ class OrderMigrationController extends Controller
                 'accepted' => true,
                 'duplicate' => true,
                 'task_id' => $acceptedDispatch->task_id,
-                'document_id' => $validated['document_id'],
+                'document_id' => $payload['document_id'],
                 'accepted_at' => $acceptedDispatch->accepted_at?->toIso8601String(),
             ], 202);
         }
@@ -94,7 +104,7 @@ class OrderMigrationController extends Controller
                 return response()->json([
                     'accepted' => false,
                     'message' => 'El pedido ya existe en Siesa y no debe encolarse nuevamente.',
-                    'document_id' => $validated['document_id'],
+                    'document_id' => $payload['document_id'],
                     'siesa_state' => $siesaState->toArray(),
                 ], 409);
             }
@@ -121,13 +131,13 @@ class OrderMigrationController extends Controller
         $this->monitor->createTask(
             $message,
             $requestTopic,
-            $validated['document_id']
+            $payload['document_id']
         );
 
         $dispatch = $this->dispatcher->dispatch(
             $requestTopic,
             $message,
-            $validated['document_id']
+            $payload['document_id']
         );
 
         if ($dispatch['mode'] === 'kafka') {
@@ -141,10 +151,38 @@ class OrderMigrationController extends Controller
         return response()->json([
             'accepted' => true,
             'task_id' => $taskId,
-            'document_id' => $validated['document_id'],
+            'document_id' => $payload['document_id'],
             'topic' => $requestTopic,
             'dispatch_mode' => $dispatch['mode'],
             'queue' => $dispatch['queue'],
         ], 202);
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function resolveOrderMigrationPayload(array $payload): array
+    {
+        if (is_numeric($payload['order_id'] ?? null)) {
+            return $this->orderPrototypeRepository->hydratePayloadFromOrderId($payload);
+        }
+
+        $missing = [];
+
+        foreach (['document_id', 'operational_center', 'document_type', 'document_number'] as $field) {
+            if (trim((string) ($payload[$field] ?? '')) === '') {
+                $missing[] = $field;
+            }
+        }
+
+        if ($missing !== []) {
+            throw new WorkerTaskProcessingException(
+                'El payload de order_migration esta incompleto. Configura: ' . implode(', ', $missing) . '.',
+                ['missing_fields' => $missing, 'payload' => $payload]
+            );
+        }
+
+        return $payload;
     }
 }

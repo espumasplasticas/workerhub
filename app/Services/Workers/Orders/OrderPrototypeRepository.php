@@ -38,6 +38,59 @@ class OrderPrototypeRepository
     }
 
     /**
+     * Completa el payload de migracion del pedido usando el rowid como fuente de verdad.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function hydratePayloadFromOrderId(array $payload): array
+    {
+        $dbConnection = trim((string) ($payload['db_connection'] ?? ''));
+        $orderId = $payload['order_id'] ?? null;
+
+        if ($dbConnection === '' || !is_numeric($orderId)) {
+            throw new WorkerTaskProcessingException(
+                'El payload de order_migration requiere db_connection y order_id para resolver el pedido.',
+                ['payload' => $payload]
+            );
+        }
+
+        $record = $this->connectionFor($dbConnection)
+            ->table($this->ordersTable())
+            ->select([
+                'PE_RowId',
+                'PE_CentroOperativo',
+                'PE_TipoDocumento',
+                'PE_NumeroDocumento',
+                'PE_CodigoTercero',
+                'PE_CodigoSucursal',
+            ])
+            ->where('PE_RowId', (int) $orderId)
+            ->first();
+
+        if (!$record instanceof stdClass) {
+            throw new WorkerTaskProcessingException(
+                'No se encontro el pedido origen para el rowid enviado a WorkerHub.',
+                ['payload' => $payload, 'order_id' => (int) $orderId]
+            );
+        }
+
+        $operationalCenter = trim((string) ($record->PE_CentroOperativo ?? ''));
+        $documentType = trim((string) ($record->PE_TipoDocumento ?? ''));
+        $documentNumber = trim((string) ($record->PE_NumeroDocumento ?? ''));
+
+        return array_merge($payload, [
+            'order_id' => (int) ($record->PE_RowId ?? $orderId),
+            'document_id' => sprintf('%s-%s-%s', $operationalCenter, $documentType, $documentNumber),
+            'operational_center' => $operationalCenter,
+            'document_type' => $documentType,
+            'document_number' => $documentNumber,
+            'client_code' => trim((string) ($record->PE_CodigoTercero ?? ($payload['client_code'] ?? ''))),
+            'client_branch' => trim((string) ($record->PE_CodigoSucursal ?? ($payload['client_branch'] ?? '001'))),
+        ]);
+    }
+
+    /**
      * @return list<stdClass>
      */
     public function findDetails(array $payload): array
