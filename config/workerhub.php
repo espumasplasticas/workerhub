@@ -258,6 +258,7 @@ return [
             'tables' => [
                 'orders' => env('WORKERHUB_ORDER_ENTERPRISE_ORDERS_TABLE', 'SiesaEnterprise.dbo.t430_cm_pv_docto'),
                 'order_lines' => env('WORKERHUB_ORDER_ENTERPRISE_ORDER_LINES_TABLE', 'SiesaEnterprise.dbo.t431_cm_pv_movto'),
+                'order_detail_view' => env('WORKERHUB_ORDER_ENTERPRISE_ORDER_DETAIL_VIEW', 'SiesaEnterprise.dbo.v431'),
                 'items' => env('WORKERHUB_ORDER_ENTERPRISE_ITEMS_TABLE', 'SiesaEnterprise.dbo.t120_mc_items'),
                 'item_extensions' => env('WORKERHUB_ORDER_ENTERPRISE_ITEM_EXTENSIONS_TABLE', 'SiesaEnterprise.dbo.t121_mc_items_extensiones'),
                 'kit_components' => env('WORKERHUB_ORDER_ENTERPRISE_KIT_COMPONENTS_TABLE', 'SiesaEnterprise.dbo.t134_mc_items_kits'),

@@ -173,7 +173,7 @@ class OrderDeliveryGenerationRepository
                     ISNULL(parent_item.f120_id, '') AS f120_id_padre,
                     ISNULL(parent_extension.f121_id_ext1_detalle, '') AS f121_id_ext1_detalle_padre,
                     SUM(detail_view.v431_cant_pedida_base * (CASE WHEN child_item.f120_referencia IS NULL THEN 1 ELSE kit_component.f134_cant_requerida END)) AS f431_cant1_pedida
-                FROM v431 AS detail_view
+                FROM %s AS detail_view
                 INNER JOIN %s AS order_doc
                     ON order_doc.f430_rowid = detail_view.v431_rowid_pv_docto
                 INNER JOIN %s AS parent_extension
@@ -195,6 +195,7 @@ class OrderDeliveryGenerationRepository
                     CASE WHEN child_item.f120_id IS NULL THEN parent_item.f120_id_unidad_inventario ELSE child_item.f120_id_unidad_inventario END,
                     ISNULL(parent_item.f120_id, ''),
                     ISNULL(parent_extension.f121_id_ext1_detalle, '')",
+                $this->enterpriseOrderDetailView(),
                 $this->enterpriseOrdersTable(),
                 $this->enterpriseItemExtensionsTable(),
                 $this->enterpriseItemsTable(),
@@ -886,6 +887,11 @@ class OrderDeliveryGenerationRepository
     private function enterpriseOrderLinesTable(): string
     {
         return (string) $this->config->get('workerhub.orders.enterprise_state.tables.order_lines', 'SiesaEnterprise.dbo.t431_cm_pv_movto');
+    }
+
+    private function enterpriseOrderDetailView(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.order_detail_view', 'SiesaEnterprise.dbo.v431');
     }
 
     private function enterpriseItemsTable(): string
