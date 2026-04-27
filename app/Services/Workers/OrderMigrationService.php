@@ -17,6 +17,7 @@ class OrderMigrationService
     public function __construct(
         private readonly SiesaImportAuditService $auditService,
         private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
+        private readonly DocumentImportAttemptControlService $documentImportAttemptControlService,
         private readonly OrderPreMigrationGuard $preMigrationGuard,
         private readonly OrderPrototypeRepository $repository,
         private readonly OrderCashConversionService $cashConversionService,
@@ -88,6 +89,10 @@ class OrderMigrationService
             $details = $measure('find_details', fn () => $this->repository->findDetails($payload));
             $orderLines = $measure('build_order_lines', fn () => $this->lineFactory->build($payload, $header, $orderRecord, $details));
             $lines = array_merge($customerSync['lines'] ?? [], $orderLines);
+            $measure('register_import_attempt_control', function () use ($payload, $customerSync): void {
+                $this->documentImportAttemptControlService->registerPreparedOrderCustomerAttempts($payload, $customerSync);
+                $this->documentImportAttemptControlService->registerOrderMigrationAttempt($payload);
+            });
             $audit = $measure('audit_import', fn () => $this->auditService->import($lines, [
                 'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
                 'task_type' => $payload['_workerhub_task_type'] ?? 'order_migration',

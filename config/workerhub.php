@@ -134,6 +134,11 @@ return [
         ))),
     ],
 
+    'import_attempt_control' => [
+        'table' => env('WORKERHUB_IMPORT_ATTEMPT_CONTROL_TABLE', 'pos.control_importacion_documentos'),
+        'customer_document_type' => env('WORKERHUB_IMPORT_ATTEMPT_CUSTOMER_DOCUMENT_TYPE', 'CLI'),
+    ],
+
     'receipts' => [
         'source_connections' => [
             'sqlsrv' => env('WORKERHUB_RECEIPT_SOURCE_SQLSRV_CONNECTION', 'source_sqlsrv'),
@@ -315,7 +320,23 @@ return [
         'tables' => [
             'invoices' => env('WORKERHUB_INVOICE_TABLE', 'pos.facturas_encabezado'),
             'details' => env('WORKERHUB_INVOICE_DETAILS_TABLE', 'pos.facturas_detalle'),
+            'payments' => env('WORKERHUB_INVOICE_PAYMENTS_TABLE', 'pos.facturas_pagos'),
+            'history' => env('WORKERHUB_INVOICE_HISTORY_TABLE', 'pos.facturas_historia_migracion'),
             'cufe' => env('WORKERHUB_INVOICE_CUFE_TABLE', 'pos.facturas_cufe'),
+            'customers' => env('WORKERHUB_INVOICE_CUSTOMERS_TABLE', 'pos.clientes'),
+            'customer_classes' => env('WORKERHUB_INVOICE_CUSTOMER_CLASSES_TABLE', 'pos.clase_de_cliente'),
+        ],
+        'customer_sync' => [
+            'enabled' => filter_var(env('WORKERHUB_INVOICE_CUSTOMER_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
+        ],
+        'cash_normalization' => [
+            'cash_registers_table' => env('WORKERHUB_INVOICE_CASH_REGISTERS_TABLE', 'SiesaEnterprise.dbo.t291_co_cajas'),
+            'cash_register_id' => env('WORKERHUB_INVOICE_CASH_REGISTER_ID', '999'),
+            'supported_payments_procedure' => env('WORKERHUB_INVOICE_SUPPORTED_PAYMENTS_PROCEDURE', 'ventas.usp_obtener_medidos_pago_del_valor_que_soporta_la_venta_V2'),
+            'minimum_supported_amount_difference' => (float) env('WORKERHUB_INVOICE_MINIMUM_SUPPORTED_AMOUNT_DIFFERENCE', -1000),
+        ],
+        'import_attempts' => [
+            'cycle_limit' => (int) env('WORKERHUB_INVOICE_IMPORT_ATTEMPT_CYCLE_LIMIT', 28),
         ],
         'enterprise_state' => [
             'tables' => [
@@ -327,6 +348,7 @@ return [
         'legacy_state' => [
             'enabled' => filter_var(env('WORKERHUB_INVOICE_LEGACY_STATE_SYNC_ENABLED', true), FILTER_VALIDATE_BOOL),
             'service_user_id' => (int) env('WORKERHUB_INVOICE_LEGACY_STATE_SERVICE_USER_ID', 285),
+            'verification_threshold' => (float) env('WORKERHUB_INVOICE_LEGACY_VERIFICATION_THRESHOLD', 50),
         ],
     ],
 

@@ -6,6 +6,7 @@ use App\Data\Receipts\ReceiptCrossReferenceSnapshot;
 use App\Data\Receipts\ReceiptPreMigrationSnapshot;
 use App\Data\SiesaWebServiceLogRecord;
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Services\Workers\DocumentImportAttemptControlService;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\ReceiptMigrationService;
 use App\Services\Workers\Receipts\ReceiptCrossReferenceGuard;
@@ -86,6 +87,10 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
+
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldReceive('registerPreparedReceiptCustomerAttempts')->once();
+        $importAttemptControl->shouldReceive('registerReceiptMigrationAttempt')->once();
 
         $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
@@ -170,6 +175,7 @@ class ReceiptMigrationServiceTest extends TestCase
         $service = new ReceiptMigrationService(
             $auditService,
             $validator,
+            $importAttemptControl,
             $guard,
             $repository,
             $crossReferenceGuard,
@@ -209,6 +215,10 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
+
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldReceive('registerPreparedReceiptCustomerAttempts')->once();
+        $importAttemptControl->shouldReceive('registerReceiptMigrationAttempt')->once();
 
         $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
@@ -269,6 +279,7 @@ class ReceiptMigrationServiceTest extends TestCase
         $service = new ReceiptMigrationService(
             $auditService,
             $validator,
+            $importAttemptControl,
             $guard,
             $repository,
             $crossReferenceGuard,
@@ -302,6 +313,10 @@ class ReceiptMigrationServiceTest extends TestCase
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldNotReceive('validate');
+
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldNotReceive('registerPreparedReceiptCustomerAttempts');
+        $importAttemptControl->shouldNotReceive('registerReceiptMigrationAttempt');
 
         $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
@@ -340,6 +355,7 @@ class ReceiptMigrationServiceTest extends TestCase
         $service = new ReceiptMigrationService(
             $auditService,
             $validator,
+            $importAttemptControl,
             $guard,
             $repository,
             $crossReferenceGuard,

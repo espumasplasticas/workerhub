@@ -17,18 +17,90 @@ class InvoiceLegacyStateService
     ) {
     }
 
-    public function markMigrated(array $payload): void
+    public function markMigrationStarted(array $payload): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $this->upsertHistory($payload, [
+            'FH_IndicadorVerificado' => 0,
+            'FH_FechaVerificado' => null,
+            'FH_IdUsuarioVerifico' => null,
+            'FH_IndicadorPedidoEstaMigrado' => 0,
+            'FH_ConsecutivoDeMigracion' => 0,
+        ]);
+    }
+
+    public function markMigrationFailed(array $payload): void
     {
         if (!$this->isEnabled()) {
             return;
         }
 
         $this->invoiceQuery($payload)->update([
+            'FE_IndicadorMigrado' => 0,
+            'FE_EstadoVerificadoExportacion' => 0,
+        ]);
+    }
+
+    public function markMigrated(array $payload): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $timestamp = Carbon::now();
+
+        $this->invoiceQuery($payload)->update([
             'FE_IndicadorMigrado' => 1,
-            'FE_FechaMigracion' => Carbon::now(),
+            'FE_IndicadorAprobadoPorCartera' => 1,
+            'FE_FechaMigracion' => $timestamp,
             'FE_CodigoUsuarioMigro' => $this->serviceUserId(),
             'FE_ConsecutivoDeMigracion' => 0,
             'FE_EstadoVerificadoExportacion' => 1,
+        ]);
+
+        $this->upsertHistory($payload, [
+            'FH_IndicadorVerificado' => 0,
+            'FH_FechaVerificado' => null,
+            'FH_IdUsuarioVerifico' => null,
+            'FH_IndicadorPedidoEstaMigrado' => 0,
+            'FH_ConsecutivoDeMigracion' => 0,
+        ]);
+    }
+
+    public function markVerified(array $payload, InvoiceSiesaStateSnapshot $snapshot, float $legacyInvoiceTotal): void
+    {
+        if (!$this->isEnabled()) {
+            return;
+        }
+
+        $timestamp = Carbon::now();
+        $this->invoiceQuery($payload)->update([
+            'FE_IndicadorMigrado' => 1,
+            'FE_IndicadorAprobadoPorCartera' => 1,
+            'FE_FechaMigracion' => $timestamp,
+            'FE_CodigoUsuarioMigro' => $this->serviceUserId(),
+            'FE_ConsecutivoDeMigracion' => 0,
+            'FE_EstadoVerificadoExportacion' => 2,
+            'FE_FechaVerificacionExportacion' => $timestamp,
+            'FE_rowid_t350_factura' => $snapshot->rowId,
+        ]);
+
+        $enterpriseInvoiceTotal = (float) ($snapshot->netTotal ?? 0);
+
+        $this->upsertHistory($payload, [
+            'FH_IndicadorVerificado' => 1,
+            'FH_FechaVerificado' => $timestamp,
+            'FH_IdUsuarioVerifico' => $this->serviceUserId(),
+            'FH_IndicadorPedidoEstaMigrado' => 1,
+            'FH_ConsecutivoDeMigracion' => 0,
+            'FH_Text' => sprintf(
+                'Factura correctamente migrada. Valor enterprise %s Valor POS %s',
+                number_format($enterpriseInvoiceTotal, 2, '.', ''),
+                number_format($legacyInvoiceTotal, 2, '.', '')
+            ),
         ]);
     }
 
@@ -38,12 +110,37 @@ class InvoiceLegacyStateService
             return;
         }
 
+        $timestamp = Carbon::now();
+
         $this->invoiceQuery($payload)->update([
             'FE_IndicadorMigrado' => 1,
+            'FE_IndicadorAprobadoPorCartera' => 1,
+            'FE_FechaMigracion' => $timestamp,
+            'FE_CodigoUsuarioMigro' => $this->serviceUserId(),
+            'FE_ConsecutivoDeMigracion' => 0,
             'FE_EstadoVerificadoExportacion' => 2,
-            'FE_FechaVerificacionExportacion' => Carbon::now(),
-            'fe_rowid_t350_factura' => $snapshot->rowId,
+            'FE_FechaVerificacionExportacion' => $timestamp,
+            'FE_rowid_t350_factura' => $snapshot->rowId,
         ]);
+
+        $this->upsertHistory($payload, [
+            'FH_IndicadorVerificado' => 1,
+            'FH_FechaVerificado' => $timestamp,
+            'FH_IdUsuarioVerifico' => $this->serviceUserId(),
+            'FH_IndicadorPedidoEstaMigrado' => 1,
+            'FH_ConsecutivoDeMigracion' => 0,
+            'FH_Text' => sprintf(
+                'Factura %s-%s-%s correctamente migrada en Siesa.',
+                trim((string) ($payload['operational_center'] ?? '')),
+                trim((string) ($payload['document_type'] ?? '')),
+                trim((string) ($payload['document_number'] ?? ''))
+            ),
+        ]);
+    }
+
+    public function verificationThreshold(): float
+    {
+        return (float) $this->config->get('workerhub.invoices.legacy_state.verification_threshold', 50);
     }
 
     private function invoiceQuery(array $payload): \Illuminate\Database\Query\Builder
@@ -55,6 +152,28 @@ class InvoiceLegacyStateService
             ->where('FE_CentroOperativo', $reference['operational_center'])
             ->where('FE_TipoDocumento', $reference['document_type'])
             ->where('FE_NumeroDocumento', $reference['document_number']);
+    }
+
+    /**
+     * @param array<string, mixed> $attributes
+     */
+    private function upsertHistory(array $payload, array $attributes): void
+    {
+        $reference = $this->resolveReference($payload);
+        $timestamp = Carbon::now();
+
+        $defaults = array_merge([
+            'FH_IdUsuario' => $this->serviceUserId(),
+            'FH_Fecha' => $timestamp,
+        ], $attributes);
+
+        $this->connectionFor($reference['db_connection'])
+            ->table($this->historyTable())
+            ->updateOrInsert([
+                'FH_CentroOperativo' => $reference['operational_center'],
+                'FH_TipoDocumento' => $reference['document_type'],
+                'FH_Numero' => $reference['document_number'],
+            ], $defaults);
     }
 
     /**
@@ -112,6 +231,11 @@ class InvoiceLegacyStateService
     private function table(): string
     {
         return (string) $this->config->get('workerhub.invoices.tables.invoices', 'pos.facturas_encabezado');
+    }
+
+    private function historyTable(): string
+    {
+        return (string) $this->config->get('workerhub.invoices.tables.history', 'pos.facturas_historia_migracion');
     }
 
     private function serviceUserId(): int

@@ -17,6 +17,7 @@ class ReceiptMigrationService
     public function __construct(
         private readonly SiesaImportAuditService $auditService,
         private readonly EpsaSoapConfigurationValidator $soapConfigurationValidator,
+        private readonly DocumentImportAttemptControlService $documentImportAttemptControlService,
         private readonly ReceiptPreMigrationGuard $preMigrationGuard,
         private readonly ReceiptPrototypeRepository $repository,
         private readonly ReceiptCrossReferenceGuard $crossReferenceGuard,
@@ -81,6 +82,10 @@ class ReceiptMigrationService
             $payments = $measure('find_payments', fn () => $this->repository->findPayments($payload));
             $receiptLines = $measure('build_receipt_lines', fn () => $this->lineFactory->build($header, $payments));
             $lines = array_merge($customerSync['lines'] ?? [], $receiptLines);
+            $measure('register_import_attempt_control', function () use ($payload, $customerSync): void {
+                $this->documentImportAttemptControlService->registerPreparedReceiptCustomerAttempts($payload, $customerSync);
+                $this->documentImportAttemptControlService->registerReceiptMigrationAttempt($payload);
+            });
             $audit = $measure('audit_import', fn () => $this->auditService->import($lines, [
                 'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
                 'task_type' => $payload['_workerhub_task_type'] ?? 'receipt_migration',

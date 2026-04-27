@@ -27,6 +27,13 @@ class WorkerTaskDispatchRegistryService
                 'migration',
                 isset($payload['source']) ? (string) $payload['source'] : null
             ),
+            'invoice_migration' => $this->buildKey(
+                'invoice',
+                isset($payload['invoice_id']) && is_numeric($payload['invoice_id']) ? (int) $payload['invoice_id'] : null,
+                (string) ($payload['document_id'] ?? ''),
+                'migration',
+                isset($payload['source']) ? (string) $payload['source'] : null
+            ),
             default => null,
         };
     }

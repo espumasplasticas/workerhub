@@ -5,6 +5,7 @@ namespace Tests\Unit;
 use App\Data\Orders\OrderSiesaStateSnapshot;
 use App\Data\Receipts\ReceiptCustomerSyncSnapshot;
 use App\Data\SiesaWebServiceLogRecord;
+use App\Services\Workers\DocumentImportAttemptControlService;
 use App\Services\Workers\EpsaSoapConfigurationValidator;
 use App\Services\Workers\OrderMigrationService;
 use App\Services\Workers\Orders\OrderCashConversionService;
@@ -58,6 +59,10 @@ class OrderMigrationServiceTest extends TestCase
 
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
+
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldReceive('registerPreparedOrderCustomerAttempts')->once();
+        $importAttemptControl->shouldReceive('registerOrderMigrationAttempt')->once();
 
         $guard = Mockery::mock(OrderPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
@@ -132,6 +137,7 @@ class OrderMigrationServiceTest extends TestCase
         $service = new OrderMigrationService(
             $auditService,
             $validator,
+            $importAttemptControl,
             $guard,
             $repository,
             $cashConversion,
@@ -182,6 +188,10 @@ class OrderMigrationServiceTest extends TestCase
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldNotReceive('validate');
 
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldNotReceive('registerPreparedOrderCustomerAttempts');
+        $importAttemptControl->shouldNotReceive('registerOrderMigrationAttempt');
+
         $guard = Mockery::mock(OrderPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
             ->once()
@@ -214,6 +224,7 @@ class OrderMigrationServiceTest extends TestCase
         $service = new OrderMigrationService(
             $auditService,
             $validator,
+            $importAttemptControl,
             $guard,
             $repository,
             $cashConversion,
@@ -272,6 +283,10 @@ class OrderMigrationServiceTest extends TestCase
         $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
         $validator->shouldReceive('validate')->once();
 
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldReceive('registerPreparedOrderCustomerAttempts')->once();
+        $importAttemptControl->shouldReceive('registerOrderMigrationAttempt')->once();
+
         $guard = Mockery::mock(OrderPreMigrationGuard::class);
         $guard->shouldReceive('assertCanMigrate')
             ->once()
@@ -328,6 +343,7 @@ class OrderMigrationServiceTest extends TestCase
         $service = new OrderMigrationService(
             $auditService,
             $validator,
+            $importAttemptControl,
             $guard,
             $repository,
             $cashConversion,
