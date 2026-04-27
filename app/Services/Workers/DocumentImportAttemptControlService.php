@@ -44,7 +44,7 @@ class DocumentImportAttemptControlService
      * Registra el intento real de importacion de factura y devuelve el numero
      * de intento resultante segun el ciclo legacy de 1..28.
      */
-    public function registerInvoiceMigrationAttemptAndReturnAttemptNumber(array $payload): int
+    public function registerInvoiceMigrationFailureAttemptAndReturnAttemptNumber(array $payload): int
     {
         return $this->registerCycledDocumentAttemptAndReturnAttemptNumber(
             $this->resolveInvoiceSourceConnectionName($payload),

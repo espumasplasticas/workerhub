@@ -12,6 +12,38 @@ class InvoicePaymentAdjustmentResolver
     }
 
     /**
+     * Devuelve la secuencia completa de ajustes de caja que debe probarse
+     * dentro de un mismo ciclo de migracion antes de considerar el intento
+     * legacy como fallido.
+     *
+     * @param list<stdClass> $detailRows
+     * @param list<stdClass> $paymentRows
+     * @return list<float>
+     */
+    public function resolveCashPaymentAdjustmentSequence(
+        stdClass $invoiceHeader,
+        array $detailRows,
+        array $paymentRows
+    ): array {
+        if (!$this->isCashInvoice($invoiceHeader)) {
+            return [0.0];
+        }
+
+        $candidates = [];
+        $legacyNetTotal = $this->legacyAmountCalculator->calculateLegacyNetTotalFromDetails($detailRows);
+        $paymentTotal = $this->legacyAmountCalculator->calculateCollectedPaymentTotal($paymentRows);
+
+        $candidates[] = $legacyNetTotal - $paymentTotal;
+        $candidates[] = $this->legacyAmountCalculator->calculateRoundedRetryAdjustment($detailRows);
+
+        for ($attemptNumber = 7; $attemptNumber <= 27; $attemptNumber++) {
+            $candidates[] = $this->resolveLegacyAlternatingAdjustmentForRetryAttempt($attemptNumber);
+        }
+
+        return $this->deduplicateAdjustments($candidates);
+    }
+
+    /**
      * @param list<stdClass> $detailRows
      * @param list<stdClass> $paymentRows
      */
@@ -37,6 +69,30 @@ class InvoicePaymentAdjustmentResolver
         }
 
         return $this->resolveLegacyAlternatingAdjustmentForRetryAttempt($attemptNumber);
+    }
+
+    /**
+     * @param list<float> $candidates
+     * @return list<float>
+     */
+    private function deduplicateAdjustments(array $candidates): array
+    {
+        $resolved = [];
+        $seen = [];
+
+        foreach ($candidates as $candidate) {
+            $normalizedCandidate = abs($candidate) < 0.0001 ? 0.0 : round($candidate, 4);
+            $key = number_format($normalizedCandidate, 4, '.', '');
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+
+            $seen[$key] = true;
+            $resolved[] = $normalizedCandidate;
+        }
+
+        return $resolved === [] ? [0.0] : $resolved;
     }
 
     private function isCashInvoice(stdClass $invoiceHeader): bool

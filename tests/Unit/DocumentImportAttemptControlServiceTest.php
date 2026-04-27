@@ -184,6 +184,6 @@ class DocumentImportAttemptControlServiceTest extends TestCase
 
         $service->registerPreparedInvoiceCustomerAttempts($payload, $customerSync);
 
-        $this->assertSame(7, $service->registerInvoiceMigrationAttemptAndReturnAttemptNumber($payload));
+        $this->assertSame(7, $service->registerInvoiceMigrationFailureAttemptAndReturnAttemptNumber($payload));
     }
 }

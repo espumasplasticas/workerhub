@@ -74,44 +74,89 @@ class InvoiceMigrationService
                 $header = $measure('find_header_after_cash_normalization', fn () => $this->repository->findHeader($payload));
             }
 
-            $customerSync = $measure('customer_sync', fn () => $this->customerSyncService->sync($payload, $header));
+            $initialCustomerSync = $measure('customer_sync', fn () => $this->customerSyncService->sync($payload, $header));
             $details = $measure('find_details', fn () => $this->repository->findDetails($payload));
             $payments = $measure('find_payments', fn () => $this->repository->findPayments($payload));
-            $attemptNumber = $measure('register_invoice_import_attempt_control', function () use ($payload, $customerSync): int {
-                $this->documentImportAttemptControlService->registerPreparedInvoiceCustomerAttempts($payload, $customerSync);
-
-                return $this->documentImportAttemptControlService->registerInvoiceMigrationAttemptAndReturnAttemptNumber($payload);
+            $measure('register_invoice_customer_import_attempt_control', function () use ($payload, $initialCustomerSync): void {
+                $this->documentImportAttemptControlService->registerPreparedInvoiceCustomerAttempts($payload, $initialCustomerSync);
             });
-            $cashPaymentAdjustment = $measure('resolve_cash_payment_adjustment', fn () => $this->paymentAdjustmentResolver->resolveCashPaymentAdjustment(
+            $cashPaymentAdjustments = $measure('resolve_cash_payment_adjustment_sequence', fn () => $this->paymentAdjustmentResolver->resolveCashPaymentAdjustmentSequence(
                 $header,
                 $details,
-                $payments,
-                $attemptNumber
+                $payments
             ));
-            $lines = $measure('build_invoice_lines', fn () => $this->lineFactory->build(
-                $header,
-                $details,
-                $payments,
-                $cashPaymentAdjustment,
-                (array) ($customerSync['lines'] ?? [])
-            ));
-            $audit = $measure('audit_import', fn () => $this->auditService->import($lines, [
-                'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
-                'task_type' => $payload['_workerhub_task_type'] ?? 'invoice_migration',
-                'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
-                'source' => $payload['source'] ?? null,
-                'import_stage' => 'invoice_migration',
-                'line_count' => count($lines),
-                'detail_count' => count($details),
-                'payment_count' => count($payments),
-                'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
-                'customer_sync' => $customerSync,
-                'import_attempt_number' => $attemptNumber,
-                'cash_payment_adjustment' => $cashPaymentAdjustment,
-            ]));
+            $internalAttemptCount = count($cashPaymentAdjustments);
+            $lastAudit = null;
+            $selectedCashPaymentAdjustment = 0.0;
+            $selectedInternalAttemptNumber = 0;
 
-            if (!$audit->result->success) {
-                $siesaStateAfterFailedImport = $measure('fetch_siesa_state_after_failed_import', fn () => $this->siesaStateService->fetch($payload, $header));
+            foreach ($cashPaymentAdjustments as $internalAttemptIndex => $cashPaymentAdjustment) {
+                $currentCustomerSync = $internalAttemptIndex === 0
+                    ? $initialCustomerSync
+                    : $this->customerSyncService->sync($payload, $header);
+
+                $lines = $this->lineFactory->build(
+                    $header,
+                    $details,
+                    $payments,
+                    $cashPaymentAdjustment,
+                    (array) ($currentCustomerSync['lines'] ?? [])
+                );
+                $audit = $this->auditService->import($lines, [
+                    'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
+                    'task_type' => $payload['_workerhub_task_type'] ?? 'invoice_migration',
+                    'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+                    'source' => $payload['source'] ?? null,
+                    'import_stage' => 'invoice_migration',
+                    'line_count' => count($lines),
+                    'detail_count' => count($details),
+                    'payment_count' => count($payments),
+                    'customer_sync_line_count' => (int) ($currentCustomerSync['line_count'] ?? 0),
+                    'customer_sync' => $currentCustomerSync,
+                    'cash_payment_adjustment' => $cashPaymentAdjustment,
+                    'invoice_adjustment_attempt_number' => $internalAttemptIndex + 1,
+                    'invoice_adjustment_attempts_total' => $internalAttemptCount,
+                ]);
+                $lastAudit = $audit;
+                $selectedCashPaymentAdjustment = $cashPaymentAdjustment;
+                $selectedInternalAttemptNumber = $internalAttemptIndex + 1;
+
+                if ($audit->result->success) {
+                    $measure('mark_migrated', fn () => $this->legacyStateService->markMigrated($payload));
+                    $importSucceeded = true;
+                    $siesaStateAfter = $measure('fetch_siesa_state_after', fn () => $this->siesaStateService->fetch($payload, $header));
+
+                    if ($siesaStateAfter->exists) {
+                        $legacyInvoiceTotal = (float) ($invoiceRecord->FE_TotalNeto ?? $header->FE_TotalNeto ?? 0);
+                        $enterpriseInvoiceTotal = (float) ($siesaStateAfter->netTotal ?? 0);
+                        $difference = abs($legacyInvoiceTotal - $enterpriseInvoiceTotal);
+
+                        if ($legacyInvoiceTotal > 0 && $enterpriseInvoiceTotal > 0 && $difference <= $this->legacyStateService->verificationThreshold()) {
+                            $measure('mark_verified', fn () => $this->legacyStateService->markVerified($payload, $siesaStateAfter, $legacyInvoiceTotal));
+                        }
+                    }
+
+                    return [
+                        'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+                        'message' => $audit->result->message,
+                        'errors' => $audit->result->errors,
+                        'line_count' => count($lines),
+                        'detail_count' => count($details),
+                        'payment_count' => count($payments),
+                        'customer_sync_line_count' => (int) ($currentCustomerSync['line_count'] ?? 0),
+                        'invoice_reference' => $this->buildReference($payload),
+                        'invoice_record' => ['row_id' => $invoiceRecord->FE_rowid ?? null],
+                        'siesa_web_service' => $audit->log->toArray(),
+                        'siesa_state' => $siesaStateAfter->toArray(),
+                        'cash_payment_adjustment' => $cashPaymentAdjustment,
+                        'invoice_adjustment_attempt_number' => $internalAttemptIndex + 1,
+                        'invoice_adjustment_attempts_total' => $internalAttemptCount,
+                        'invoice_failure_attempt_number' => 0,
+                        'timings_ms' => $timings,
+                    ];
+                }
+
+                $siesaStateAfterFailedImport = $this->siesaStateService->fetch($payload, $header);
 
                 if ($siesaStateAfterFailedImport->exists) {
                     $measure('mark_detected_in_siesa_after_failed_import', fn () => $this->legacyStateService->markDetectedInSiesa($payload, $siesaStateAfterFailedImport));
@@ -125,50 +170,29 @@ class InvoiceMigrationService
                         'siesa_state' => $siesaStateAfterFailedImport->toArray(),
                         'already_migrated' => true,
                         'siesa_web_service' => $audit->log->toArray(),
+                        'cash_payment_adjustment' => $cashPaymentAdjustment,
+                        'invoice_adjustment_attempt_number' => $internalAttemptIndex + 1,
+                        'invoice_adjustment_attempts_total' => $internalAttemptCount,
+                        'invoice_failure_attempt_number' => 0,
                         'timings_ms' => $timings,
                     ];
                 }
-
-                throw new WorkerTaskProcessingException(
-                    $audit->result->message,
-                    [
-                        'errors' => $audit->result->errors,
-                        'payload' => $payload,
-                        'siesa_web_service' => $audit->log->toArray(),
-                    ]
-                );
             }
 
-            $measure('mark_migrated', fn () => $this->legacyStateService->markMigrated($payload));
-            $importSucceeded = true;
-            $siesaStateAfter = $measure('fetch_siesa_state_after', fn () => $this->siesaStateService->fetch($payload, $header));
+            $failedAttemptNumber = $measure('register_invoice_failure_attempt_control', fn () => $this->documentImportAttemptControlService->registerInvoiceMigrationFailureAttemptAndReturnAttemptNumber($payload));
 
-            if ($siesaStateAfter->exists) {
-                $legacyInvoiceTotal = (float) ($invoiceRecord->FE_TotalNeto ?? $header->FE_TotalNeto ?? 0);
-                $enterpriseInvoiceTotal = (float) ($siesaStateAfter->netTotal ?? 0);
-                $difference = abs($legacyInvoiceTotal - $enterpriseInvoiceTotal);
-
-                if ($legacyInvoiceTotal > 0 && $enterpriseInvoiceTotal > 0 && $difference <= $this->legacyStateService->verificationThreshold()) {
-                    $measure('mark_verified', fn () => $this->legacyStateService->markVerified($payload, $siesaStateAfter, $legacyInvoiceTotal));
-                }
-            }
-
-            return [
-                'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
-                'message' => $audit->result->message,
-                'errors' => $audit->result->errors,
-                'line_count' => count($lines),
-                'detail_count' => count($details),
-                'payment_count' => count($payments),
-                'customer_sync_line_count' => (int) ($customerSync['line_count'] ?? 0),
-                'invoice_reference' => $this->buildReference($payload),
-                'invoice_record' => ['row_id' => $invoiceRecord->FE_rowid ?? null],
-                'siesa_web_service' => $audit->log->toArray(),
-                'siesa_state' => $siesaStateAfter->toArray(),
-                'import_attempt_number' => $attemptNumber,
-                'cash_payment_adjustment' => $cashPaymentAdjustment,
-                'timings_ms' => $timings,
-            ];
+            throw new WorkerTaskProcessingException(
+                $lastAudit?->result->message ?? 'No fue posible migrar la factura luego de recorrer todos los ajustes legacy disponibles.',
+                [
+                    'errors' => $lastAudit?->result->errors ?? [],
+                    'payload' => $payload,
+                    'siesa_web_service' => $lastAudit?->log->toArray(),
+                    'cash_payment_adjustment' => $selectedCashPaymentAdjustment,
+                    'invoice_adjustment_attempt_number' => $selectedInternalAttemptNumber,
+                    'invoice_adjustment_attempts_total' => $internalAttemptCount,
+                    'invoice_failure_attempt_number' => $failedAttemptNumber,
+                ]
+            );
         } catch (Throwable $exception) {
             if (!$importSucceeded) {
                 $measure('mark_migration_failed', fn () => $this->legacyStateService->markMigrationFailed($payload));
