@@ -16,7 +16,7 @@ class WorkerTaskDispatchRegistryController extends Controller
     public function show(Request $request): JsonResponse
     {
         $validated = $request->validate([
-            'entity_type' => ['required', 'in:receipt,order'],
+            'entity_type' => ['required', 'in:receipt,order,invoice'],
             'document_id' => ['required', 'string'],
             'event_type' => ['nullable', 'string'],
         ]);
