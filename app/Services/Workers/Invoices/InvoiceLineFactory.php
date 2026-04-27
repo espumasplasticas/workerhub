@@ -28,20 +28,35 @@ class InvoiceLineFactory
         $lines = array_values($customerSyncLines);
         $lines[] = $headerAdapter->toLine();
         $paymentCondition = strtoupper(trim((string) ($headerRow->f461_id_cond_pago ?? '')));
-
         if ($this->shouldEmitPaymentLines($headerRow, $paymentCondition)) {
-            $isFirstPaymentLine = true;
+            // Prepare effective payments array. If a cash adjustment is requested,
+            // we append an explicit adjustment payment row instead of mutating
+            // the existing first payment. This makes the change deterministic
+            // and auditable in the generated lines.
+            $effectivePayments = array_values($paymentRows);
 
-            foreach ($paymentRows as $paymentRow) {
+            if ($cashPaymentAdjustment !== 0.0) {
+                $adjustment = new \stdClass();
+                // Ensure document identification fields exist on the adjustment so
+                // the connector hydrator and adapter can build a valid line.
+                $adjustment->F350_ID_CO = $headerRow->F350_ID_CO ?? ($headerRow->f350_id_co ?? null);
+                $adjustment->F350_ID_TIPO_DOCTO = $headerRow->F350_ID_TIPO_DOCTO ?? ($headerRow->f350_id_tipo_docto ?? null);
+                $adjustment->F350_CONSEC_DOCTO = $headerRow->F350_CONSEC_DOCTO ?? ($headerRow->f350_consec_docto ?? null);
+
+                // Use the first payment method if available, otherwise a fallback code '999'.
+                $firstPaymentMethod = $paymentRows[0]->F358_ID_MEDIOS_PAGO ?? $paymentRows[0]->f358_id_medios_pago ?? '999';
+                $adjustment->F358_ID_MEDIOS_PAGO = $firstPaymentMethod;
+                $adjustment->F358_ID_MONEDA = $paymentRows[0]->F358_ID_MONEDA ?? $paymentRows[0]->f358_id_moneda ?? null;
+
+                $adjustment->F_VLR_MEDIO_PAGO = $cashPaymentAdjustment;
+                $adjustment->F_VLR_MEDIO_PAGO_LOCAL = $cashPaymentAdjustment;
+
+                $effectivePayments[] = $adjustment;
+            }
+
+            foreach ($effectivePayments as $paymentRow) {
                 $paymentConnector = $this->hydrate(new PrototipoFacturaCaja(), $paymentRow);
-
-                if ($isFirstPaymentLine && $cashPaymentAdjustment !== 0.0) {
-                    $paymentConnector->F_VLR_MEDIO_PAGO = (float) ($paymentConnector->F_VLR_MEDIO_PAGO ?? 0) + $cashPaymentAdjustment;
-                    $paymentConnector->F_VLR_MEDIO_PAGO_LOCAL = (float) ($paymentConnector->F_VLR_MEDIO_PAGO_LOCAL ?? 0) + $cashPaymentAdjustment;
-                }
-
                 $lines[] = (new LegacyInvoicePaymentAdapter($paymentConnector))->toLine();
-                $isFirstPaymentLine = false;
             }
         } else {
             $lines[] = $headerAdapter->toAccountsReceivableLine();

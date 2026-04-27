@@ -72,20 +72,17 @@ class InvoiceLegacyAmountCalculator
             }
 
             $legacyNetValue = (float) ($detailRow->FD_ValorNeto ?? 0);
-            $legacyRoundedNetValue = round(
-                round(
-                    round(
-                        round(
-                            round((float) ($detailRow->FD_PrecioUnitario ?? 0), 0) / 1.19
-                            * (1 - ((float) ($detailRow->FD_TasaDescuento ?? 0) / 100)),
-                            0
-                        ) * (1 - ((float) ($detailRow->FD_TasaDescuento2 ?? 0) / 100)),
-                        0
-                    ) * (float) ($detailRow->FD_CantidadFacturada ?? 0),
-                    0
-                ) * 1.19,
-                0
-            );
+
+            $precioUnitario = round((float) ($detailRow->FD_PrecioUnitario ?? 0), 0);
+            $tasaDesc1 = (float) ($detailRow->FD_TasaDescuento ?? 0) / 100.0;
+            $tasaDesc2 = (float) ($detailRow->FD_TasaDescuento2 ?? 0) / 100.0;
+            $cantidad = (float) ($detailRow->FD_CantidadFacturada ?? 0);
+
+            $precioSinIva = round($precioUnitario / 1.19, 0);
+            $precioConDesc1 = round($precioSinIva * (1 - $tasaDesc1), 0);
+            $precioConDesc2 = round($precioConDesc1 * (1 - $tasaDesc2), 0);
+            $valorNetoPorCantidad = round($precioConDesc2 * $cantidad, 0);
+            $legacyRoundedNetValue = round($valorNetoPorCantidad * 1.19, 0);
 
             $detailDifference = $legacyNetValue - $legacyRoundedNetValue;
 
