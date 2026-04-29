@@ -30,17 +30,14 @@ class InvoiceMigrationController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        // Minimal validation: require `invoice_id` + `db_connection` only.
+        // Other reference fields (document_id, operational_center, ...) are removed
+        // to keep the request minimal — WorkerHub will hydrate them server-side
+        // using `invoice_id`.
         $validated = $request->validate([
-            'invoice_id' => ['nullable', 'integer'],
-            'document_id' => ['nullable', 'string'],
+            'invoice_id' => ['required', 'integer'],
             'db_connection' => ['required', 'string'],
-            'operational_center' => ['nullable', 'string'],
-            'document_type' => ['nullable', 'string'],
-            'document_number' => ['nullable'],
             'company_id' => ['nullable', 'integer'],
-            'client_code' => ['nullable', 'string'],
-            'client_branch' => ['nullable', 'string'],
-            'invoice_total' => ['nullable', 'numeric'],
             'created_by_user_id' => ['nullable', 'integer'],
             'source' => ['nullable', 'string'],
             'priority' => ['nullable', 'in:default,high'],
@@ -61,17 +58,11 @@ class InvoiceMigrationController extends Controller
             'created_by_user_id' => $validated['created_by_user_id'] ?? null,
         ], static fn ($value) => is_scalar($value) && trim((string) $value) !== ''));
 
+        // Build a minimal payload — avoid sending redundant reference fields.
         $payload = [
-            'invoice_id' => $validated['invoice_id'] ?? null,
-            'document_id' => $validated['document_id'] ?? null,
+            'invoice_id' => $validated['invoice_id'],
             'db_connection' => $validated['db_connection'],
-            'operational_center' => trim((string) ($validated['operational_center'] ?? '')),
-            'document_type' => trim((string) ($validated['document_type'] ?? '')),
-            'document_number' => trim((string) ($validated['document_number'] ?? '')),
             'company_id' => $validated['company_id'] ?? null,
-            'client_code' => $validated['client_code'] ?? null,
-            'client_branch' => $validated['client_branch'] ?? null,
-            'invoice_total' => $validated['invoice_total'] ?? null,
             'created_by_user_id' => $validated['created_by_user_id'] ?? null,
             'source' => $validated['source'] ?? 'api',
             'metadata' => $metadata,
@@ -164,21 +155,9 @@ class InvoiceMigrationController extends Controller
             return $this->repository->hydratePayloadFromInvoiceId($payload);
         }
 
-        $missing = [];
-
-        foreach (['document_id', 'operational_center', 'document_type', 'document_number'] as $field) {
-            if (trim((string) ($payload[$field] ?? '')) === '') {
-                $missing[] = $field;
-            }
-        }
-
-        if ($missing !== []) {
-            throw new WorkerTaskProcessingException(
-                'El payload de invoice_migration esta incompleto. Configura: ' . implode(', ', $missing) . '.',
-                ['missing_fields' => $missing, 'payload' => $payload]
-            );
-        }
-
-        return $payload;
+        throw new WorkerTaskProcessingException(
+            'El payload de invoice_migration requiere `invoice_id` para resolverse. No se aceptan referencias completas desde el cliente; envía solo `invoice_id` y `db_connection`.',
+            ['payload' => $payload]
+        );
     }
 }
