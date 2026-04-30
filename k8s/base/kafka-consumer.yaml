@@ -1,0 +1,49 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workerhub-kafka-consumer
+  namespace: workerhub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workerhub-kafka-consumer
+  template:
+    metadata:
+      labels:
+        app: workerhub-kafka-consumer
+    spec:
+      containers:
+        - name: kafka-consumer
+          image: ghcr.io/comodisimos/workerhub-php-k8s:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: workerhub-config
+            - secretRef:
+                name: workerhub-secrets
+          command:
+            - sh
+            - -lc
+            - php artisan kafka:consume-worker-tasks
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: workerhub-kafka-consumer
+  namespace: workerhub
+spec:
+  scaleTargetRef:
+    name: workerhub-kafka-consumer
+  minReplicaCount: 1
+  maxReplicaCount: 8
+  cooldownPeriod: 60
+  pollingInterval: 15
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: redpanda-cluster.kafka.svc.cluster.local:9092
+        consumerGroup: workerhub-task-consumers
+        topic: workerhub.tasks.requests
+        lagThreshold: "10"
+        activationLagThreshold: "1"

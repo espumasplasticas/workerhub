@@ -101,6 +101,18 @@ return [
         'redis:migration-default' => 120,
         'redis:migration-high' => 60,
         'redis:integration' => 120,
+        'redis:receipts-default' => 120,
+        'redis:receipts-high' => 60,
+        'redis:sales-orders-default' => 120,
+        'redis:sales-orders-high' => 60,
+        'redis:deliveries-default' => 120,
+        'redis:deliveries-high' => 60,
+        'redis:invoices-default' => 120,
+        'redis:invoices-high' => 60,
+        'redis:customers-default' => 120,
+        'redis:customers-high' => 60,
+        'redis:general-default' => 120,
+        'redis:general-high' => 60,
     ],
 
     /*
@@ -200,9 +212,89 @@ return [
     */
 
     'defaults' => [
-        'supervisor-migrations' => [
+        'supervisor-receipts' => [
             'connection' => 'redis',
-            'queue' => ['migration-high', 'migration-default'],
+            'queue' => ['receipts-high', 'receipts-default'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 3,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'nice' => 0,
+        ],
+        'supervisor-sales-orders' => [
+            'connection' => 'redis',
+            'queue' => ['sales-orders-high', 'sales-orders-default'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'nice' => 0,
+        ],
+        'supervisor-deliveries' => [
+            'connection' => 'redis',
+            'queue' => ['deliveries-high', 'deliveries-default'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'nice' => 0,
+        ],
+        'supervisor-invoices' => [
+            'connection' => 'redis',
+            'queue' => ['invoices-high', 'invoices-default'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'nice' => 0,
+        ],
+        'supervisor-customers' => [
+            'connection' => 'redis',
+            'queue' => ['customers-high', 'customers-default'],
+            'balance' => 'auto',
+            'autoScalingStrategy' => 'time',
+            'minProcesses' => 1,
+            'maxProcesses' => 2,
+            'maxTime' => 0,
+            'maxJobs' => 0,
+            'memory' => 256,
+            'tries' => 3,
+            'timeout' => 300,
+            'balanceMaxShift' => 1,
+            'balanceCooldown' => 3,
+            'nice' => 0,
+        ],
+        'supervisor-general' => [
+            'connection' => 'redis',
+            'queue' => ['general-high', 'general-default', 'migration-high', 'migration-default'],
             'balance' => 'auto',
             'autoScalingStrategy' => 'time',
             'minProcesses' => 1,
@@ -236,9 +328,29 @@ return [
 
     'environments' => [
         'production' => [
-            'supervisor-migrations' => [
+            'supervisor-receipts' => [
                 'minProcesses' => 2,
                 'maxProcesses' => 12,
+            ],
+            'supervisor-sales-orders' => [
+                'minProcesses' => 1,
+                'maxProcesses' => 8,
+            ],
+            'supervisor-deliveries' => [
+                'minProcesses' => 1,
+                'maxProcesses' => 6,
+            ],
+            'supervisor-invoices' => [
+                'minProcesses' => 1,
+                'maxProcesses' => 8,
+            ],
+            'supervisor-customers' => [
+                'minProcesses' => 1,
+                'maxProcesses' => 6,
+            ],
+            'supervisor-general' => [
+                'minProcesses' => 1,
+                'maxProcesses' => 4,
             ],
             'supervisor-integrations' => [
                 'minProcesses' => 1,
@@ -249,13 +361,45 @@ return [
         ],
 
         'local' => [
-            'supervisor-migrations' => [
-                'minProcesses' => 1,
-                'maxProcesses' => 6,
+            'supervisor-receipts' => [
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
-            'supervisor-integrations' => [
+            'supervisor-sales-orders' => [
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
+            ],
+            'supervisor-deliveries' => [
+                'minProcesses' => 3,
+                'maxProcesses' => 10,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
+            ],
+            'supervisor-invoices' => [
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
+            ],
+            'supervisor-customers' => [
                 'minProcesses' => 1,
                 'maxProcesses' => 2,
+            ],
+            'supervisor-general' => [
+                'minProcesses' => 2,
+                'maxProcesses' => 8,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
+            ],
+            'supervisor-integrations' => [
+                'minProcesses' => 5,
+                'maxProcesses' => 16,
+                'balanceMaxShift' => 2,
+                'balanceCooldown' => 1,
             ],
         ],
     ],

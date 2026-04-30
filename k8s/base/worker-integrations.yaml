@@ -1,0 +1,56 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workerhub-worker-integrations
+  namespace: workerhub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: workerhub-worker-integrations
+  template:
+    metadata:
+      labels:
+        app: workerhub-worker-integrations
+    spec:
+      containers:
+        - name: queue-worker
+          image: ghcr.io/comodisimos/workerhub-php-k8s:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: workerhub-config
+            - secretRef:
+                name: workerhub-secrets
+          command:
+            - sh
+            - -lc
+            - php artisan queue:work redis --queue=integration,default --sleep=1 --tries=3 --timeout=180 --backoff=5 --max-time=3600
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: workerhub-worker-integrations
+  namespace: workerhub
+spec:
+  scaleTargetRef:
+    name: workerhub-worker-integrations
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  cooldownPeriod: 60
+  pollingInterval: 15
+  triggers:
+    - type: redis
+      metadata:
+        addressFromEnv: KEDA_REDIS_ADDRESS
+        listName: queues:integration
+        listLength: "5"
+        activationListLength: "1"
+        passwordFromEnv: REDIS_PASSWORD
+    - type: redis
+      metadata:
+        addressFromEnv: KEDA_REDIS_ADDRESS
+        listName: queues:default
+        listLength: "5"
+        activationListLength: "1"
+        passwordFromEnv: REDIS_PASSWORD

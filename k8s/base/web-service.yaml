@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: workerhub-web
+  namespace: workerhub
+spec:
+  selector:
+    app: workerhub-web
+  ports:
+    - name: http
+      port: 80
+      targetPort: 80

@@ -66,4 +66,9 @@ class WorkerTask extends Model
     {
         return $this->hasMany(self::class, 'parent_task_id')->latest('created_at');
     }
+
+    public function operationLogs(): HasMany
+    {
+        return $this->hasMany(WorkerOperationLog::class, 'worker_task_id')->latest();
+    }
 }

@@ -2,8 +2,11 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Data\MonitorTaskFilters;
+use App\Data\OperationLogFilters;
 use App\Http\Controllers\Controller;
 use App\Services\Workers\WorkerTaskMonitorService;
+use App\Services\Workers\WorkerOperationLogService;
 use App\Services\Workers\WorkerTaskReplayService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -13,36 +16,129 @@ class WorkerTaskMonitorController extends Controller
 {
     public function __construct(
         private readonly WorkerTaskMonitorService $monitor,
-        private readonly WorkerTaskReplayService $replayService
+        private readonly WorkerTaskReplayService $replayService,
+        private readonly WorkerOperationLogService $operationLogs
     )
     {
     }
 
     public function index(Request $request): JsonResponse
     {
+        $filters = MonitorTaskFilters::fromArray($request->all());
         $tasks = $this->monitor->listTasks(
-            $request->only(['status', 'type', 'source']),
+            $filters,
             (int) $request->integer('per_page', 25)
         );
+
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.tasks.index', 'success', null, [
+                'filters' => $filters->toArray(),
+            ]);
+        }
 
         return response()->json($tasks);
     }
 
-    public function show(string $taskId): JsonResponse
+    public function show(Request $request, string $taskId): JsonResponse
     {
+        $this->operationLogs->record($request, 'monitor.tasks.show', 'success', $taskId);
+
         return response()->json($this->monitor->getTask($taskId));
     }
 
-    public function summary(): JsonResponse
+    public function summary(Request $request): JsonResponse
     {
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.tasks.summary', 'success');
+        }
+
         return response()->json($this->monitor->summary());
     }
 
     public function deadLetters(Request $request): JsonResponse
     {
+        $filters = MonitorTaskFilters::fromArray($request->all(), true);
+
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.dead_letters.index', 'success');
+        }
+
         return response()->json(
-            $this->monitor->listDeadLetters((int) $request->integer('per_page', 25))
+            $this->monitor->listDeadLetters($filters, (int) $request->integer('per_page', 25))
         );
+    }
+
+    public function exportDeadLetters(Request $request): JsonResponse
+    {
+        $filters = MonitorTaskFilters::fromArray($request->all(), true);
+        $payload = $this->monitor->exportDeadLetters($filters, (int) $request->integer('limit', 250));
+
+        $this->operationLogs->record($request, 'dead_letters.export', 'success', null, [
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json([
+            'exported_at' => now()->toIso8601String(),
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+            'items' => $payload,
+        ]);
+    }
+
+    public function actions(Request $request): JsonResponse
+    {
+        $filters = OperationLogFilters::fromArray($request->all());
+        if ($this->shouldRecord($request)) {
+            $this->operationLogs->record($request, 'monitor.actions.index', 'success');
+        }
+
+        return response()->json(
+            $this->operationLogs->listRecent($filters, (int) $request->integer('per_page', 25))
+        );
+    }
+
+    public function exportTasks(Request $request): JsonResponse
+    {
+        $filters = MonitorTaskFilters::fromArray($request->all());
+        $payload = $this->monitor->exportTasks($filters, (int) $request->integer('limit', 250));
+
+        $this->operationLogs->record($request, 'monitor.tasks.export', 'success', null, [
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json([
+            'exported_at' => now()->toIso8601String(),
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+            'items' => $payload,
+        ]);
+    }
+
+    public function exportActions(Request $request): JsonResponse
+    {
+        $filters = OperationLogFilters::fromArray($request->all());
+        $payload = $this->operationLogs->export($filters, (int) $request->integer('limit', 250));
+
+        $this->operationLogs->record($request, 'monitor.actions.export', 'success', null, [
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json([
+            'exported_at' => now()->toIso8601String(),
+            'count' => count($payload),
+            'filters' => $filters->toArray(),
+            'items' => $payload,
+        ]);
+    }
+
+    public function lineage(Request $request, string $taskId): JsonResponse
+    {
+        $this->operationLogs->record($request, 'monitor.tasks.lineage', 'success', $taskId);
+
+        return response()->json($this->monitor->getTaskLineage($taskId));
     }
 
     public function socketConfig(): JsonResponse
@@ -64,11 +160,17 @@ class WorkerTaskMonitorController extends Controller
     public function retry(string $taskId): JsonResponse
     {
         try {
-            return response()->json(
-                $this->replayService->replay($taskId),
-                202
-            );
+            $result = $this->replayService->replay($taskId);
+            $this->operationLogs->record(request(), 'task.retry', 'success', $taskId, [
+                'new_task_id' => $result['task_id'] ?? null,
+            ]);
+
+            return response()->json($result, 202);
         } catch (InvalidArgumentException $exception) {
+            $this->operationLogs->record(request(), 'task.retry', 'failed', $taskId, [
+                'message' => $exception->getMessage(),
+            ]);
+
             return response()->json([
                 'message' => $exception->getMessage(),
             ], 422);
@@ -82,9 +184,34 @@ class WorkerTaskMonitorController extends Controller
             'task_ids.*' => ['required', 'string'],
         ]);
 
-        return response()->json(
-            $this->replayService->replayMany($validated['task_ids']),
-            202
-        );
+        $result = $this->replayService->replayMany($validated['task_ids']);
+        $this->operationLogs->record($request, 'task.retry_batch', 'success', null, [
+            'task_ids' => $validated['task_ids'],
+            'accepted_count' => $result['accepted_count'],
+            'error_count' => $result['error_count'],
+        ]);
+
+        return response()->json($result, 202);
+    }
+
+    public function retryFiltered(Request $request): JsonResponse
+    {
+        $filters = MonitorTaskFilters::fromArray($request->all());
+        $limit = (int) $request->integer('limit', 100);
+        $result = $this->replayService->replayFiltered($filters, $limit);
+
+        $this->operationLogs->record($request, 'task.retry_filtered', 'success', null, [
+            'matched_count' => $result['matched_count'],
+            'accepted_count' => $result['accepted_count'],
+            'error_count' => $result['error_count'],
+            'filters' => $filters->toArray(),
+        ]);
+
+        return response()->json($result, 202);
+    }
+
+    private function shouldRecord(Request $request): bool
+    {
+        return !filter_var($request->query('silent', false), FILTER_VALIDATE_BOOLEAN);
     }
 }

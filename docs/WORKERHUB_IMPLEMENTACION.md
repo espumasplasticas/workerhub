@@ -14,6 +14,11 @@
 - Se dockerizo el proyecto con Nginx, dos instancias PHP, Redpanda, Redis, Echo Server, Horizon y scheduler conectando a SQL Server externo.
 - Se agrego una consola operativa web con replay manual y bandeja logica de DLQ.
 - Se agrego replay por lote, topic Kafka dedicado para dead letters y middleware de proteccion operativa.
+- Se agrego auditoria persistente de acciones operativas y export JSON de dead letters.
+- Se agregaron filtros operativos extendidos, export de tareas/auditoria, retry filtrado y lineage de replays.
+- Se agrego autenticacion productiva en WorkerHub delegada a `backoffice_service` con sesion web propia y fallback tecnico auditado.
+- Se agregaron healthchecks operativos para SQL Server, Redis, Kafka, backoffice auth y umbral de dead letters.
+- Se agrego un modo de desarrollo `direct_queue` para operar sin Kafka local y validar el flujo end-to-end sobre Redis.
 
 3) Logica de negocio
 
@@ -26,6 +31,11 @@
 - Los cambios de estado tambien se emiten por sockets para monitores en tiempo real.
 - Las tareas `failed` y `rejected` pueden reencolarse manualmente preservando trazabilidad padre-hijo.
 - Los rechazos y fallos terminales se publican tambien en el topic de dead letters.
+- Toda accion operativa relevante sobre el monitor queda auditada en `worker_operation_logs`.
+- Las operaciones batch deben respetar el conjunto filtrado actual del monitor.
+- La trazabilidad de replay se conserva via `parent_task_id` y se expone como lineage.
+- El acceso principal al monitor requiere validacion remota contra `backoffice_service`.
+- Solo usuarios activos con rol administrador configurado (`20` por default) pueden abrir sesion.
 
 4) Alcance
 
@@ -60,6 +70,7 @@
 
 - Flujo general
 - Laravel recibe tarea, la registra y la publica en Kafka
+- En desarrollo puede despachar directo a Redis cuando Kafka esta deshabilitado de forma explicita
 - Kafka consumer recibe, valida y encola en Redis
 - Horizon ejecuta y balancea workers por demanda
 - El monitor registra transiciones y resultados
@@ -73,9 +84,18 @@
 - `WorkerTaskReplayService`
 - `DocumentMigrationService`
 - `WorkerOperationsDashboardController`
+- `WorkerOperationLogService`
+- `MonitorTaskFilters`
+- `OperationLogFilters`
 - `EnsureWorkerHubOperatorAccess`
+- `BackofficeAuthHttpClient`
+- `WorkerHubSessionController`
+- `WorkerHubOperatorSessionManager`
+- `WorkerHubHealthService`
+- `WorkerTaskDispatchService`
 - Flujo de datos (fuente-> procesamiento-> almacenamiento -> consumidores)
 - Cliente -> API Laravel -> Kafka -> Redis/Horizon -> servicio de negocio -> SQL Server + Kafka results/failures + sockets + notificaciones
+- Operador -> WorkerHub login -> backoffice_service -> sesion web -> monitor operativo
 
 7) Backend
 
@@ -85,9 +105,13 @@
 - Job de despacho
 - Servicios de monitoreo y notificaciones
 - Servicio de replay operativo
+- Servicio de auditoria operativa
+- Objetos de filtros reutilizables para monitor y auditoria
 - Docker stack
 - Broadcasting por sockets
 - Publicacion Kafka a dead letters
+- Login web propio con validacion remota de operadores
+- Healthchecks operativos y comando `workerhub:healthcheck`
 - Casos de error y soluciones
 - Mensaje Kafka invalido: se marca como rechazado y se publica evento de fallo
 - Fallo de negocio en job: se marca fallido y se notifica
@@ -99,6 +123,7 @@
 - `worker_tasks`
 - `worker_task_events`
 - `notifications`
+- `worker_operation_logs`
 - Campos nuevos
 - `parent_task_id`
 - `replayed_at`
@@ -114,6 +139,10 @@
 - monitor de tareas
 - notificacion por fallo
 - ingreso de tarea y resumen del monitor
+- export de dead letters
+- auditoria de operaciones
+- retry filtrado
+- lineage de replays
 - Como verificar manualmente:
 - publicar una tarea en `/api/worker-tasks`
 - validar registro en `worker_tasks`
@@ -122,6 +151,12 @@
 - suscribirse al canal `workerhub.monitor`
 - reencolar una tarea terminal desde `/api/monitor/tasks/{taskId}/retry`
 - reencolar varias tareas desde `/api/monitor/tasks/retry-batch`
+- exportar dead letters desde `/api/monitor/dead-letters/export`
+- revisar historial reciente desde `/api/monitor/actions`
+- exportar tareas desde `/api/monitor/tasks/export`
+- exportar auditoria desde `/api/monitor/actions/export`
+- ejecutar retry filtrado desde `/api/monitor/tasks/retry-filtered`
+- revisar lineage desde `/api/monitor/tasks/{taskId}/lineage`
 
 13) Despliegue y puesta en marcha
 
@@ -136,7 +171,15 @@
 - `HORIZON_ALLOWED_EMAILS`
 - `PUSHER_*`
 - `WORKERHUB_OPERATIONS_TOKEN`
-- `WORKERHUB_OPERATIONS_ALLOWED_EMAILS`
+- `WORKERHUB_ALLOW_TOKEN_FALLBACK`
+- `WORKERHUB_ALLOW_LOCAL_BYPASS`
+- `WORKERHUB_DEAD_LETTERS_ALERT_THRESHOLD`
+- `BACKOFFICE_BASE_URL`
+- `BACKOFFICE_AUTH_ENDPOINT`
+- `BACKOFFICE_HEALTH_ENDPOINT`
+- `BACKOFFICE_AUTH_TIMEOUT`
+- `BACKOFFICE_ADMIN_ROLE_ID`
+- `BACKOFFICE_SHARED_TOKEN`
 - Plan de difusion
 - habilitar primero en ambiente interno y luego conectar aplicaciones productoras
 
@@ -152,6 +195,8 @@
 - replay manual desde panel web y API
 - Seguridad
 - middleware de operador para panel y endpoints de monitoreo
+- health endpoint con degradacion por dependencias criticas
+- auditoria de login, logout, denegaciones y uso de token fallback
 
 15) Riesgos y mitigaciones
 
@@ -160,6 +205,7 @@
 - SQL Server caido: no hay monitor persistente; se debe tratar como dependencia critica
 - Docker Compose no escala contenedores solo: usar Horizon ahora y KEDA/Kubernetes despues
 - La DLQ operativa se consulta desde base de datos y los eventos terminales tambien se publican al topic Kafka dedicado de dead letters
+- En desarrollo sin Kafka real se puede usar `KAFKA_PUBLISH_ENABLED=false` + `WORKERHUB_KAFKA_DIRECT_DISPATCH_FALLBACK=true` para validar cola, monitor, fallo y replay
 
 16) Diagrama de flujo
 

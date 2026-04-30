@@ -22,9 +22,9 @@ class WorkerTaskConsumer
 
     public function consumeRequests(): void
     {
-        $topic = (string) config('workerhub.kafka.topics.requests');
+        $topics = $this->resolveRequestTopics();
         $consumer = new Consumer(
-            $this->configFactory->makeConsumerConfig($topic),
+            $this->configFactory->makeConsumerConfig($topics),
             function (ConsumeMessage $message): void {
                 $this->handleMessage($message);
             }
@@ -50,25 +50,78 @@ class WorkerTaskConsumer
                 throw new \InvalidArgumentException('El mensaje Kafka debe contener un objeto JSON con type.');
             }
 
-            $queue = $this->workerTaskRouter->resolveQueue($task);
-            $task['tries'] = $this->workerTaskRouter->resolveTries($task);
-            $task['timeout'] = $this->workerTaskRouter->resolveTimeout($task);
+            $executionPlan = $this->workerTaskRouter->resolveExecutionPlan($task);
+            $task['tries'] = (int) ($executionPlan['tries'] ?? $this->workerTaskRouter->resolveTries($task));
+            $task['timeout'] = (int) ($executionPlan['timeout'] ?? $this->workerTaskRouter->resolveTimeout($task));
 
-            DispatchWorkerTaskJob::dispatch($task)
-                ->onConnection('redis')
-                ->onQueue($queue);
+            if (($executionPlan['runtime'] ?? 'php') === 'php') {
+                $queue = (string) ($executionPlan['queue'] ?? $this->workerTaskRouter->resolveQueue($task));
 
-            if (isset($task['task_id']) && is_string($task['task_id'])) {
-                $this->monitor->markQueued($task['task_id'], $queue);
+                DispatchWorkerTaskJob::dispatch($task)
+                    ->onConnection('redis')
+                    ->onQueue($queue);
+
+                if (isset($task['task_id']) && is_string($task['task_id'])) {
+                    $this->monitor->markQueued($task['task_id'], $queue);
+                }
+
+                Log::info('Worker task enqueued from Kafka.', [
+                    'type' => $task['type'],
+                    'process_key' => $executionPlan['process_key'] ?? null,
+                    'runtime' => 'php',
+                    'queue' => $queue,
+                    'key' => $key,
+                    'tries' => $task['tries'],
+                    'timeout' => $task['timeout'],
+                ]);
+            } else {
+                $executionTopic = (string) ($executionPlan['execution_topic'] ?? '');
+
+                if ($executionTopic === '') {
+                    throw new \RuntimeException('La tarea no tiene topic de ejecucion externo configurado.');
+                }
+
+                $externalPayload = array_merge($task, [
+                    'execution_plan' => $executionPlan,
+                ]);
+
+                $published = $this->producer->publish($executionTopic, $externalPayload, is_scalar($key) ? (string) $key : null, [
+                    'workerhub-runtime' => (string) ($executionPlan['runtime'] ?? 'external'),
+                    'workerhub-process' => (string) ($executionPlan['process_key'] ?? 'general'),
+                    'workerhub-task-id' => (string) ($task['task_id'] ?? ''),
+                ]);
+
+                if (!$published) {
+                    throw new \RuntimeException(sprintf(
+                        'No fue posible delegar la tarea a runtime externo %s.',
+                        (string) ($executionPlan['runtime'] ?? 'external')
+                    ));
+                }
+
+                if (isset($task['task_id']) && is_string($task['task_id'])) {
+                    $this->monitor->markQueued($task['task_id'], 'kafka:' . $executionTopic);
+                    $this->monitor->addEvent(
+                        $task['task_id'],
+                        'task.delegated',
+                        'Task delegated to external Kafka runtime.',
+                        [
+                            'runtime' => $executionPlan['runtime'] ?? 'external',
+                            'topic' => $executionTopic,
+                            'process_key' => $executionPlan['process_key'] ?? null,
+                        ]
+                    );
+                }
+
+                Log::info('Worker task delegated to external runtime.', [
+                    'type' => $task['type'],
+                    'process_key' => $executionPlan['process_key'] ?? null,
+                    'runtime' => $executionPlan['runtime'] ?? 'external',
+                    'topic' => $executionTopic,
+                    'key' => $key,
+                    'tries' => $task['tries'],
+                    'timeout' => $task['timeout'],
+                ]);
             }
-
-            Log::info('Worker task enqueued from Kafka.', [
-                'type' => $task['type'],
-                'queue' => $queue,
-                'key' => $key,
-                'tries' => $task['tries'],
-                'timeout' => $task['timeout'],
-            ]);
 
             $message->getConsumer()->ack($message);
         } catch (Throwable $exception) {
@@ -100,5 +153,36 @@ class WorkerTaskConsumer
 
             $message->getConsumer()->ack($message);
         }
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function resolveRequestTopics(): array
+    {
+        $topics = [];
+        $configuredRequestTopic = trim((string) config('workerhub.kafka.topics.requests', ''));
+
+        if ($configuredRequestTopic !== '') {
+            $topics[] = $configuredRequestTopic;
+        }
+
+        if ((bool) config('workerhub.kafka.consume_all_process_topics', false)) {
+            foreach ((array) config('workerhub.processes', []) as $processDefinition) {
+                $requestTopic = trim((string) data_get($processDefinition, 'topics.requests', ''));
+
+                if ($requestTopic !== '') {
+                    $topics[] = $requestTopic;
+                }
+            }
+        }
+
+        $topics = array_values(array_unique($topics));
+
+        if ($topics === []) {
+            $topics[] = 'workerhub.tasks.requests';
+        }
+
+        return $topics;
     }
 }

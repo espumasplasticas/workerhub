@@ -1,0 +1,39 @@
+FROM php:8.1-fpm
+
+ENV COMPOSER_ALLOW_SUPERUSER=1
+
+RUN apt-get update && apt-get install -y \
+    curl \
+    git \
+    gnupg \
+    unzip \
+    zip \
+    libzip-dev \
+    libicu-dev \
+    libonig-dev \
+    libxml2-dev \
+    unixodbc-dev \
+    && curl -sSL https://github.com/mlocati/docker-php-extension-installer/releases/latest/download/install-php-extensions -o /usr/local/bin/install-php-extensions \
+    && chmod +x /usr/local/bin/install-php-extensions \
+    && install-php-extensions pdo_mysql bcmath pcntl posix sockets sqlsrv pdo_sqlsrv \
+    && rm -rf /var/lib/apt/lists/*
+
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+COPY docker/php/php.ini /usr/local/etc/php/conf.d/workerhub.ini
+COPY docker/php/start.sh /usr/local/bin/workerhub-start
+
+WORKDIR /var/www/html
+
+COPY composer.json composer.lock ./
+RUN composer install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-scripts
+
+COPY . .
+
+RUN chmod +x /usr/local/bin/workerhub-start \
+    && mkdir -p storage/logs bootstrap/cache \
+    && touch storage/logs/laravel.log \
+    && chown -R www-data:www-data storage bootstrap/cache >/dev/null 2>&1 || true \
+    && chmod -R ug+rwX storage bootstrap/cache >/dev/null 2>&1 || true
+
+ENTRYPOINT ["/usr/local/bin/workerhub-start"]
+CMD ["php-fpm"]

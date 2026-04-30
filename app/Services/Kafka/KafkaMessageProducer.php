@@ -2,7 +2,9 @@
 
 namespace App\Services\Kafka;
 
+use Illuminate\Support\Facades\Log;
 use longlang\phpkafka\Producer\Producer;
+use Throwable;
 
 class KafkaMessageProducer
 {
@@ -10,8 +12,12 @@ class KafkaMessageProducer
     {
     }
 
-    public function publish(string $topic, array $message, ?string $key = null, array $headers = []): void
+    public function publish(string $topic, array $message, ?string $key = null, array $headers = []): bool
     {
+        if (!$this->isPublishEnabled()) {
+            return false;
+        }
+
         $producer = new Producer($this->configFactory->makeProducerConfig());
 
         try {
@@ -21,24 +27,49 @@ class KafkaMessageProducer
                 $key,
                 $this->normalizeHeaders($headers)
             );
+            return true;
+        } catch (Throwable $exception) {
+            if ($this->shouldSuppressPublishFailure()) {
+                Log::warning('WorkerHub Kafka publish skipped after failure.', [
+                    'topic' => $topic,
+                    'task_id' => $message['task_id'] ?? null,
+                    'type' => $message['type'] ?? null,
+                    'error' => $exception->getMessage(),
+                ]);
+
+                return false;
+            }
+
+            throw $exception;
         } finally {
             $producer->close();
         }
     }
 
-    public function publishResult(array $message, ?string $key = null): void
+    public function publishResult(array $message, ?string $key = null): bool
     {
-        $this->publish((string) config('workerhub.kafka.topics.results'), $message, $key);
+        return $this->publish((string) config('workerhub.kafka.topics.results'), $message, $key);
     }
 
-    public function publishFailure(array $message, ?string $key = null): void
+    public function publishFailure(array $message, ?string $key = null): bool
     {
-        $this->publish((string) config('workerhub.kafka.topics.failures'), $message, $key);
+        return $this->publish((string) config('workerhub.kafka.topics.failures'), $message, $key);
     }
 
-    public function publishDeadLetter(array $message, ?string $key = null): void
+    public function publishDeadLetter(array $message, ?string $key = null): bool
     {
-        $this->publish((string) config('workerhub.kafka.topics.dead_letters'), $message, $key);
+        return $this->publish((string) config('workerhub.kafka.topics.dead_letters'), $message, $key);
+    }
+
+    private function isPublishEnabled(): bool
+    {
+        return (bool) config('workerhub.kafka.publish_enabled', true);
+    }
+
+    private function shouldSuppressPublishFailure(): bool
+    {
+        return (bool) config('workerhub.kafka.suppress_publish_failures', false)
+            || (bool) config('workerhub.kafka.direct_dispatch_fallback', false);
     }
 
     private function normalizeHeaders(array $headers): array

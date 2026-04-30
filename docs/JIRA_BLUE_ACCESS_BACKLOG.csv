@@ -1,0 +1,4 @@
+Summary,Issue Type,Priority,Labels,Description
+"WorkerHub: unificar acceso de Horizon con sesion validada por backoffice","Task","High","workerhub,security,horizon,backoffice-auth","Reemplazar el gate local de Horizon para que el acceso dependa exclusivamente de la sesion operativa autorizada por backoffice_service, alineando monitor y Horizon bajo una sola autenticacion."
+"WorkerHub: redisenar login con identidad visual azul corporativa","Task","Medium","workerhub,ui,branding,auth","Actualizar la pantalla de login de WorkerHub con una linea visual azul corporativa, mejor jerarquia de acceso y contexto claro sobre la autenticacion contra backoffice_service."
+"WorkerHub: redisenar monitor y branding perimetral de Horizon","Task","Medium","workerhub,ui,branding,horizon,monitor","Actualizar el monitor operativo y el layout de Horizon con navegacion visible, paleta azul corporativa, lectura operativa mas clara y enlace de retorno entre monitor y Horizon."

@@ -1,0 +1,158 @@
+<?php
+
+namespace App\Services\Workers\Orders;
+
+use App\Data\Orders\OrderSiesaStateSnapshot;
+use App\Exceptions\WorkerTaskProcessingException;
+use App\Services\Workers\SiesaImportAuditService;
+use Epsalibrary\Siesa\Connectors\ConectorPedidoCompromiso;
+use Illuminate\Contracts\Config\Repository;
+use Illuminate\Database\ConnectionInterface;
+use Illuminate\Database\DatabaseManager;
+use stdClass;
+
+class OrderCancellationCommitmentReleaseService
+{
+    public function __construct(
+        private readonly DatabaseManager $database,
+        private readonly Repository $config,
+        private readonly SiesaImportAuditService $auditService
+    ) {
+    }
+
+    /**
+     * Descompromete el pedido en Siesa cuando el estado actual es comprometido.
+     *
+     * @param array<string, mixed> $payload
+     */
+    public function releaseIfCommitted(array $payload, OrderSiesaStateSnapshot $snapshot): int
+    {
+        if ((int) ($snapshot->stateIndicator ?? 0) !== 3) {
+            return 0;
+        }
+
+        $connection = $this->connectionFor(trim((string) ($payload['db_connection'] ?? '')));
+        $detailRows = $this->findCommittedDetailRows($connection, (int) $snapshot->rowId);
+        $lines = [];
+
+        foreach ($detailRows as $detailRow) {
+            if ((int) ($detailRow->f431_ind_estado ?? 0) !== 3) {
+                continue;
+            }
+
+            $lines[] = ConectorPedidoCompromiso::instance(
+                trim((string) $snapshot->enterpriseOperationalCenter),
+                trim((string) $snapshot->enterpriseDocumentType),
+                trim((string) $snapshot->enterpriseDocumentNumber),
+                (int) ($detailRow->f431_rowid ?? 0),
+                trim((string) ($detailRow->f431_id_item ?? '')),
+                trim((string) ($detailRow->f431_id_ext1_detalle ?? '')),
+                trim((string) ($detailRow->f431_id_bodega ?? '')),
+                trim((string) ($detailRow->f431_id_unidad_medida ?? '')),
+                0,
+                trim((string) ($detailRow->f431_id_ubicacion_aux ?? '')) !== ''
+                    ? trim((string) $detailRow->f431_id_ubicacion_aux)
+                    : null
+            )->obtenerLinea();
+        }
+
+        if ($lines === []) {
+            return 0;
+        }
+
+        $audit = $this->auditService->import($lines, [
+            'worker_task_id' => $payload['_workerhub_task_id'] ?? null,
+            'task_type' => $payload['_workerhub_task_type'] ?? 'order_cancellation',
+            'document_id' => $payload['document_id'] ?? '',
+            'source' => $payload['source'] ?? null,
+            'import_stage' => 'order_cancellation_release_commitment',
+            'line_count' => count($lines),
+        ]);
+
+        if (!$audit->result->success) {
+            throw new WorkerTaskProcessingException(
+                'Error al descomprometer el pedido antes de anularlo en Siesa: ' . $audit->result->message,
+                [
+                    'errors' => $audit->result->errors,
+                    'payload' => $payload,
+                    'siesa_web_service' => $audit->log->toArray(),
+                ]
+            );
+        }
+
+        return count($lines);
+    }
+
+    /**
+     * @return list<stdClass>
+     */
+    private function findCommittedDetailRows(ConnectionInterface $connection, int $rowId): array
+    {
+        if ($rowId <= 0) {
+            return [];
+        }
+
+        $rows = $connection->select(
+            sprintf(
+                "SELECT
+                    t431.f431_rowid,
+                    RTRIM(CONVERT(varchar(50), t120.f120_id)) AS f431_id_item,
+                    RTRIM(ISNULL(t121.f121_id_ext1_detalle, '')) AS f431_id_ext1_detalle,
+                    RTRIM(ISNULL(t150.f150_id, '')) AS f431_id_bodega,
+                    RTRIM(ISNULL(t120.f120_id_unidad_inventario, '')) AS f431_id_unidad_medida,
+                    CAST('' AS varchar(10)) AS f431_id_ubicacion_aux,
+                    t431.f431_ind_estado
+                FROM %s AS t431
+                INNER JOIN %s AS t121
+                    ON t431.f431_rowid_item_ext = t121.f121_rowid
+                INNER JOIN %s AS t120
+                    ON t121.f121_rowid_item = t120.f120_rowid
+                INNER JOIN %s AS t150
+                    ON t431.f431_rowid_bodega = t150.f150_rowid
+                WHERE t431.f431_rowid_pv_docto = ?",
+                $this->enterpriseOrderLinesTable(),
+                $this->enterpriseItemExtensionsTable(),
+                $this->enterpriseItemsTable(),
+                $this->enterpriseWarehousesTable()
+            ),
+            [$rowId]
+        );
+
+        return array_values(array_filter($rows, static fn ($row) => $row instanceof stdClass));
+    }
+
+    private function connectionFor(string $sourceConnection): ConnectionInterface
+    {
+        $configuredConnections = (array) $this->config->get('workerhub.orders.source_connections', []);
+        $connection = (string) ($configuredConnections[$sourceConnection] ?? $sourceConnection);
+
+        if (!$this->database->connection($connection)->getPdo()) {
+            throw new WorkerTaskProcessingException(
+                sprintf('No se pudo abrir la conexion de origen para descomprometer el pedido: %s.', $connection),
+                ['source_connection' => $sourceConnection, 'resolved_connection' => $connection]
+            );
+        }
+
+        return $this->database->connection($connection);
+    }
+
+    private function enterpriseOrderLinesTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.order_lines', 'SiesaEnterprise.dbo.t431_cm_pv_movto');
+    }
+
+    private function enterpriseItemsTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.items', 'SiesaEnterprise.dbo.t120_mc_items');
+    }
+
+    private function enterpriseItemExtensionsTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.item_extensions', 'SiesaEnterprise.dbo.t121_mc_items_extensiones');
+    }
+
+    private function enterpriseWarehousesTable(): string
+    {
+        return (string) $this->config->get('workerhub.orders.enterprise_state.tables.warehouses', 'SiesaEnterprise.dbo.t150_mc_bodegas');
+    }
+}

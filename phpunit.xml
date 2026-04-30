@@ -31,5 +31,10 @@
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>
         <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="WORKERHUB_ALLOW_LOCAL_BYPASS" value="true"/>
+        <env name="WORKERHUB_ALLOW_TOKEN_FALLBACK" value="true"/>
+        <env name="KAFKA_PUBLISH_ENABLED" value="true"/>
+        <env name="WORKERHUB_KAFKA_DIRECT_DISPATCH_FALLBACK" value="false"/>
+        <env name="WORKERHUB_KAFKA_SUPPRESS_PUBLISH_FAILURES" value="false"/>
     </php>
 </phpunit>
