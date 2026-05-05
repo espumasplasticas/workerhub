@@ -2,8 +2,10 @@
 
 namespace Tests\Feature;
 
+use App\Jobs\DispatchWorkerTaskJob;
 use App\Services\Kafka\KafkaMessageProducer;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Queue;
 use Mockery;
 use Tests\TestCase;
 
@@ -14,7 +16,7 @@ class WorkerTaskControllerTest extends TestCase
     public function test_it_accepts_and_persists_a_worker_task_before_publishing_to_kafka(): void
     {
         $producer = Mockery::mock(KafkaMessageProducer::class);
-        $producer->shouldReceive('publish')->once();
+        $producer->shouldReceive('publish')->once()->andReturn(true);
         $this->app->instance(KafkaMessageProducer::class, $producer);
 
         $response = $this->postJson('/api/worker-tasks', [
@@ -47,6 +49,43 @@ class WorkerTaskControllerTest extends TestCase
         $this->assertDatabaseHas('worker_task_events', [
             'worker_task_id' => $taskId,
             'event' => 'task.published',
+        ]);
+    }
+
+    public function test_it_falls_back_to_direct_queue_dispatch_when_kafka_publish_is_disabled(): void
+    {
+        Queue::fake();
+
+        config()->set('workerhub.kafka.publish_enabled', false);
+        config()->set('workerhub.kafka.direct_dispatch_fallback', true);
+
+        $response = $this->postJson('/api/worker-tasks', [
+            'type' => 'document_migration',
+            'priority' => 'high',
+            'payload' => [
+                'document_id' => 'DOC-1002',
+                'source' => 'erp',
+                'lines' => ['04300002001...'],
+            ],
+        ]);
+
+        $response->assertAccepted()
+            ->assertJsonPath('dispatch_mode', 'direct_queue')
+            ->assertJsonPath('queue', config('workerhub.tasks.document_migration.high_priority_queue'));
+
+        $taskId = $response->json('task_id');
+
+        Queue::assertPushed(DispatchWorkerTaskJob::class, 1);
+
+        $this->assertDatabaseHas('worker_tasks', [
+            'id' => $taskId,
+            'status' => 'queued',
+            'queue' => config('workerhub.tasks.document_migration.high_priority_queue'),
+        ]);
+
+        $this->assertDatabaseHas('worker_task_events', [
+            'worker_task_id' => $taskId,
+            'event' => 'task.queued',
         ]);
     }
 }

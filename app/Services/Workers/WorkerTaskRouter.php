@@ -3,41 +3,45 @@
 namespace App\Services\Workers;
 
 use App\Exceptions\WorkerTaskProcessingException;
+use App\Support\WorkerTaskExecutionPlanResolver;
 use InvalidArgumentException;
 
 class WorkerTaskRouter
 {
-    public function __construct(private readonly DocumentMigrationService $documentMigrationService)
-    {
+    public function __construct(
+        private readonly WorkerTaskExecutionPlanResolver $executionPlan,
+        private readonly DocumentMigrationService $documentMigrationService,
+        private readonly InvoiceMigrationService $invoiceMigrationService,
+        private readonly OrderCancellationService $orderCancellationService,
+        private readonly OrderDeliveryGenerationService $orderDeliveryGenerationService,
+        private readonly OrderMigrationService $orderMigrationService,
+        private readonly ReceiptCancellationService $receiptCancellationService,
+        private readonly ReceiptMigrationService $receiptMigrationService
+    ) {
     }
 
     public function resolveQueue(array $task): string
     {
-        $type = (string) ($task['type'] ?? '');
-        $priority = strtolower((string) ($task['priority'] ?? 'default'));
-
-        return match ($type) {
-            'document_migration' => $priority === 'high'
-                ? (string) config('workerhub.tasks.document_migration.high_priority_queue')
-                : (string) config('workerhub.tasks.document_migration.queue'),
-            default => (string) config('workerhub.queues.default'),
-        };
+        return (string) ($this->executionPlan->resolve($task)['queue'] ?? config('workerhub.queues.default'));
     }
 
     public function resolveTries(array $task): int
     {
-        return match ((string) ($task['type'] ?? '')) {
-            'document_migration' => (int) config('workerhub.tasks.document_migration.tries', 3),
-            default => 3,
-        };
+        return (int) ($this->executionPlan->resolve($task)['tries'] ?? 3);
     }
 
     public function resolveTimeout(array $task): int
     {
-        return match ((string) ($task['type'] ?? '')) {
-            'document_migration' => (int) config('workerhub.tasks.document_migration.timeout', 300),
-            default => 180,
-        };
+        return (int) ($this->executionPlan->resolve($task)['timeout'] ?? 180);
+    }
+
+    /**
+     * @param array<string, mixed> $task
+     * @return array<string, mixed>
+     */
+    public function resolveExecutionPlan(array $task): array
+    {
+        return $this->executionPlan->resolve($task);
     }
 
     public function handle(array $task): array
@@ -49,8 +53,17 @@ class WorkerTaskRouter
             throw new WorkerTaskProcessingException('El payload de la tarea debe ser un objeto JSON.', ['task' => $task]);
         }
 
+        $payload['_workerhub_task_id'] = $task['task_id'] ?? null;
+        $payload['_workerhub_task_type'] = $type;
+
         return match ($type) {
             'document_migration' => $this->documentMigrationService->handle($payload),
+            'invoice_migration' => $this->invoiceMigrationService->handle($payload),
+            'order_cancellation' => $this->orderCancellationService->handle($payload),
+            'order_delivery_generation' => $this->orderDeliveryGenerationService->handle($payload),
+            'order_migration' => $this->orderMigrationService->handle($payload),
+            'receipt_cancellation' => $this->receiptCancellationService->handle($payload),
+            'receipt_migration' => $this->receiptMigrationService->handle($payload),
             default => throw new InvalidArgumentException(sprintf('Tipo de tarea no soportado: %s', $type)),
         };
     }

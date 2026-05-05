@@ -1,0 +1,60 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workerhub-worker-python-customers
+  namespace: workerhub
+spec:
+  replicas: 0
+  selector:
+    matchLabels:
+      app: workerhub-worker-python-customers
+  template:
+    metadata:
+      labels:
+        app: workerhub-worker-python-customers
+    spec:
+      containers:
+        - name: python-worker
+          image: ghcr.io/comodisimos/workerhub-python-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              valueFrom:
+                configMapKeyRef:
+                  name: workerhub-config
+                  key: KAFKA_BROKERS
+            - name: KAFKA_TOPIC
+              valueFrom:
+                configMapKeyRef:
+                  name: workerhub-config
+                  key: KAFKA_TOPIC_CUSTOMERS_EXECUTION
+            - name: KAFKA_CONSUMER_GROUP
+              value: workerhub-python-customers
+            - name: WORKERHUB_CALLBACK_BASE_URL
+              value: http://workerhub-web
+            - name: WORKERHUB_RUNTIME_SHARED_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: workerhub-secrets
+                  key: WORKERHUB_RUNTIME_SHARED_TOKEN
+---
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: workerhub-worker-python-customers
+  namespace: workerhub
+spec:
+  scaleTargetRef:
+    name: workerhub-worker-python-customers
+  minReplicaCount: 0
+  maxReplicaCount: 10
+  cooldownPeriod: 60
+  pollingInterval: 15
+  triggers:
+    - type: kafka
+      metadata:
+        bootstrapServers: redpanda-cluster.kafka.svc.cluster.local:9092
+        consumerGroup: workerhub-python-customers
+        topic: workerhub.runtime.python.customers
+        lagThreshold: "5"
+        activationLagThreshold: "1"

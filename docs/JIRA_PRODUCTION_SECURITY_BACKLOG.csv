@@ -1,0 +1,4 @@
+Summary,Issue Type,Priority,Labels,Description
+"WorkerHub: autenticacion web propia contra backoffice_service","Task","High","workerhub,security,backoffice-auth","Agregar login/logout propio en WorkerHub con sesion Laravel minima y autorizacion remota contra backoffice_service para operadores con rol administrador."
+"WorkerHub: endurecer monitor y fallback tecnico de acceso","Task","High","workerhub,security,operations","Actualizar middleware workerhub.operator para priorizar sesion web autorizada, dejar el token tecnico como fallback controlado y auditar accesos, denegaciones y uso del token."
+"WorkerHub: healthchecks productivos y documentacion de despliegue seguro","Task","High","workerhub,healthchecks,documentation","Agregar chequeos de SQL Server, Redis, Kafka y backoffice auth, comando de healthcheck para Docker, documentacion de acceso productivo y pruebas automatizadas."

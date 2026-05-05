@@ -53,7 +53,7 @@ Respuesta:
   "broadcaster": "pusher",
   "key": "workerhub-key",
   "host": "localhost",
-  "port": 6001,
+  "port": 6002,
   "scheme": "http",
   "cluster": "mt1",
   "channels": {

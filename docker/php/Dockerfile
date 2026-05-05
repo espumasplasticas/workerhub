@@ -18,7 +18,11 @@ RUN apt-get update && apt-get install -y \
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 COPY docker/php/php.ini /usr/local/etc/php/conf.d/workerhub.ini
+COPY docker/php/start.sh /usr/local/bin/workerhub-start
+
+RUN chmod +x /usr/local/bin/workerhub-start
 
 WORKDIR /var/www/html
 
+ENTRYPOINT ["/usr/local/bin/workerhub-start"]
 CMD ["php-fpm"]

@@ -6,9 +6,13 @@ Este modulo deja a `WorkerHub` no solo como API de ingreso de tareas, sino como 
 
 - monitorear tareas en vivo,
 - revisar dead letters,
+- exportar dead letters en JSON,
+- exportar tareas filtradas y auditoria operativa en JSON,
 - reencolar tareas terminales,
 - reencolar tareas en lote,
-- seguir el historial de replays.
+- reencolar tareas terminales por filtros,
+- seguir el historial de replays,
+- auditar acciones operativas sobre el monitor.
 
 ## Pantalla web
 
@@ -23,8 +27,13 @@ La vista muestra:
 
 - resumen de volumen y estado,
 - filtros por estado, tipo y origen,
+- filtros por prioridad, queue, fechas, replay/original y presencia de error,
 - listado de tareas,
 - detalle con eventos,
+- lineage original -> replay -> replay hijo,
+- historial de acciones operativas recientes,
+- export de DLQ en JSON,
+- export de tareas filtradas y acciones filtradas,
 - accion de replay para tareas `failed` o `rejected`.
 
 ## Endpoints operativos
@@ -66,6 +75,31 @@ En esta etapa la DLQ es logica, no un topic separado. Se consideran dead letters
 - `failed`
 - `rejected`
 
+### Export de DLQ
+
+```http
+GET /api/monitor/dead-letters/export
+```
+
+Respuesta:
+
+- `exported_at`
+- `count`
+- `items`
+
+Cada item devuelve el estado persistido de la tarea, incluyendo:
+
+- `id`
+- `type`
+- `source`
+- `status`
+- `priority`
+- `queue`
+- `attempts`
+- `error_message`
+- `payload`
+- `metadata`
+
 ### Replay manual
 
 ```http
@@ -100,12 +134,97 @@ Respuesta:
 - `accepted`
 - `errors`
 
+### Historial de acciones
+
+```http
+GET /api/monitor/actions
+```
+
+Devuelve acciones operativas recientes sobre el monitor, incluyendo:
+
+- vistas del panel,
+- consultas de resumen,
+- consultas de tareas,
+- exportaciones DLQ,
+- replay individual,
+- replay por lote.
+
+### Export de tareas filtradas
+
+```http
+GET /api/monitor/tasks/export
+```
+
+Usa los mismos filtros de `GET /api/monitor/tasks`.
+
+### Export de acciones filtradas
+
+```http
+GET /api/monitor/actions/export
+```
+
+Filtros soportados:
+
+- `worker_task_id`
+- `action`
+- `status`
+- `actor`
+- `channel`
+- `date_from`
+- `date_to`
+
+### Retry por filtros
+
+```http
+POST /api/monitor/tasks/retry-filtered
+```
+
+Usa los mismos filtros de tarea y solo reencola registros terminales (`failed`, `rejected`).
+
+### Lineage de tarea
+
+```http
+GET /api/monitor/tasks/{taskId}/lineage
+```
+
+Devuelve:
+
+- `requested_task_id`
+- `root_task_id`
+- `lineage`
+
 ## Modelo de datos
 
 Campos nuevos relevantes en `worker_tasks`:
 
 - `parent_task_id`: referencia logica a la tarea original.
 - `replayed_at`: fecha del ultimo replay manual sobre la tarea origen.
+
+Nueva tabla:
+
+- `worker_operation_logs`: auditoria de acciones web y API.
+
+Campos relevantes:
+
+- `action`
+- `status`
+- `actor`
+- `channel`
+- `worker_task_id`
+- `context`
+
+Filtros operativos de tareas soportados:
+
+- `status`
+- `type`
+- `source`
+- `priority`
+- `queue`
+- `date_from`
+- `date_to`
+- `replay_mode`
+- `error_mode`
+- `only_dead_letters`
 
 ## Regla operativa
 
@@ -123,10 +242,41 @@ La DLQ ya publica en el topic Kafka dedicado configurado en `KAFKA_TOPIC_DEAD_LE
 
 El panel y los endpoints de monitor usan middleware `workerhub.operator`.
 
-Formas de acceso:
+Canales de acceso soportados:
 
-- usuario autenticado cuyo email exista en `WORKERHUB_OPERATIONS_ALLOWED_EMAILS`
-- token compartido en header `X-WorkerHub-Token`
-- token compartido en query string `?token=...` para el panel web
+- `web_session`: acceso principal. Requiere login propio en WorkerHub y validacion remota en `backoffice_service`.
+- `token_operator`: fallback tecnico mediante header `X-WorkerHub-Token` o query `?token=...`.
+- `local_bypass`: solo desarrollo/testing cuando `WORKERHUB_ALLOW_LOCAL_BYPASS=true` y no hay token tecnico configurado.
 
-Si no configuras token ni usuarios permitidos, solo el ambiente `local` queda abierto por conveniencia de desarrollo.
+Reglas:
+
+- la autoridad de acceso es `backoffice_service`
+- el rol requerido se controla con `BACKOFFICE_ADMIN_ROLE_ID` y por defecto es `20`
+- si backoffice no responde, WorkerHub niega acceso
+- el token tecnico debe tratarse como excepcion operativa y queda auditado
+
+## Auditoria operativa
+
+Cada accion relevante del monitor registra una fila en `worker_operation_logs`.
+
+Acciones auditadas en esta etapa:
+
+- `monitor.view`
+- `monitor.tasks.index`
+- `monitor.tasks.show`
+- `monitor.tasks.summary`
+- `monitor.dead_letters.index`
+- `monitor.actions.index`
+- `dead_letters.export`
+- `monitor.tasks.export`
+- `monitor.actions.export`
+- `monitor.tasks.lineage`
+- `task.retry`
+- `task.retry_batch`
+- `task.retry_filtered`
+- `auth.login.success`
+- `auth.login.failed`
+- `auth.login.denied`
+- `auth.logout`
+- `auth.access.denied`
+- `auth.token_fallback.used`

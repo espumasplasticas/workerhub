@@ -1,0 +1,4 @@
+Summary,Issue Type,Priority,Labels,Description
+"WorkerHub: filtros batch reutilizables para monitor","Task","High","workerhub,monitor,batch-operations","Implementar objetos de filtros reutilizables para tareas y auditoria. Aplicar filtros extendidos en listados, exports y retry filtrado."
+"WorkerHub: panel operativo con retry filtrado y exportaciones","Task","High","workerhub,ui,batch-operations","Extender el monitor web con filtros avanzados, persistencia local, export de tareas, export de acciones y retry filtrado con confirmacion."
+"WorkerHub: lineage de replays y cobertura automatizada","Task","High","workerhub,lineage,tests","Agregar endpoint de lineage, visualizacion en el panel, pruebas unitarias/feature y documentacion operativa de la nueva entrega."
