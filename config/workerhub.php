@@ -1,6 +1,13 @@
 <?php
 
 return [
+    'features' => [
+        // Controla despliegue por partes: activar recibos/invoices/auto-dispatch
+        'receipts_enabled' => filter_var(env('WORKERHUB_FEATURE_RECEIPTS_ENABLED', true), FILTER_VALIDATE_BOOL),
+        'invoices_enabled' => filter_var(env('WORKERHUB_FEATURE_INVOICES_ENABLED', false), FILTER_VALIDATE_BOOL),
+        'auto_dispatch_invoice_after_receipt' => filter_var(env('WORKERHUB_FEATURE_AUTO_DISPATCH_INVOICE_AFTER_RECEIPT', false), FILTER_VALIDATE_BOOL),
+    ],
+
     'queues' => [
         'default' => env('WORKERHUB_DEFAULT_QUEUE', 'migration-default'),
         'high_priority' => env('WORKERHUB_HIGH_PRIORITY_QUEUE', 'migration-high'),
@@ -110,6 +117,7 @@ return [
         'base_url' => rtrim((string) env('BACKOFFICE_BASE_URL', ''), '/'),
         'auth_endpoint' => env('BACKOFFICE_AUTH_ENDPOINT', '/api/internal/workerhub/operators/authenticate'),
         'health_endpoint' => env('BACKOFFICE_HEALTH_ENDPOINT', '/api/internal/workerhub/operators/health'),
+        'health_critical' => filter_var(env('BACKOFFICE_HEALTH_CRITICAL', true), FILTER_VALIDATE_BOOL),
         'auth_timeout' => (float) env('BACKOFFICE_AUTH_TIMEOUT', 5),
         'admin_role_id' => (int) env('BACKOFFICE_ADMIN_ROLE_ID', 20),
         'shared_token' => env('BACKOFFICE_SHARED_TOKEN', ''),

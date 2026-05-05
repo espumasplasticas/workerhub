@@ -30,6 +30,13 @@ class ReceiptMigrationController extends Controller
 
     public function store(Request $request): JsonResponse
     {
+        if (!config('workerhub.features.receipts_enabled', true)) {
+            return response()->json([
+                'accepted' => false,
+                'message' => 'Receipt migrations are disabled by configuration.',
+            ], 503);
+        }
+
         $validated = $request->validate([
             'receipt_id' => ['nullable', 'integer'],
             'document_id' => ['nullable', 'string'],
