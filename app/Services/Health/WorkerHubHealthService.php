@@ -93,7 +93,7 @@ class WorkerHubHealthService
 
         return [
             'ok' => (bool) ($health['ok'] ?? false),
-            'critical' => true,
+            'critical' => (bool) config('workerhub.backoffice.health_critical', true),
             'status_code' => $health['status_code'] ?? null,
             'message' => $health['message'] ?? null,
         ];

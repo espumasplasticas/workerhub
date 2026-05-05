@@ -19,6 +19,7 @@ class WorkerHubHealthControllerTest extends TestCase
 
     public function test_it_reports_degraded_status_when_backoffice_auth_is_unavailable(): void
     {
+        config()->set('workerhub.backoffice.health_critical', true);
         config()->set('epsa_library.soap.url', 'https://siesa.test/ws');
         config()->set('epsa_library.soap.user', 'user');
         config()->set('epsa_library.soap.password', 'secret');
@@ -39,6 +40,32 @@ class WorkerHubHealthControllerTest extends TestCase
         $response->assertStatus(503)
             ->assertJsonPath('status', 'degraded')
             ->assertJsonPath('checks.backoffice.ok', false);
+    }
+
+    public function test_it_reports_ok_when_non_critical_backoffice_health_is_unavailable(): void
+    {
+        config()->set('workerhub.backoffice.health_critical', false);
+        config()->set('epsa_library.soap.url', 'https://siesa.test/ws');
+        config()->set('epsa_library.soap.user', 'user');
+        config()->set('epsa_library.soap.password', 'secret');
+        config()->set('epsa_library.soap.connection', 'UNOEE');
+
+        $client = Mockery::mock(BackofficeAuthClientInterface::class);
+        $client->shouldReceive('health')
+            ->once()
+            ->andReturn([
+                'ok' => false,
+                'status_code' => 405,
+                'message' => null,
+            ]);
+        $this->app->instance(BackofficeAuthClientInterface::class, $client);
+
+        $response = $this->getJson('/api/health/workerhub');
+
+        $response->assertOk()
+            ->assertJsonPath('status', 'ok')
+            ->assertJsonPath('checks.backoffice.ok', false)
+            ->assertJsonPath('checks.backoffice.critical', false);
     }
 
     public function test_it_reports_degraded_status_when_siesa_soap_configuration_is_missing(): void

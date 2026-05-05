@@ -142,4 +142,23 @@ class ReceiptMigrationControllerTest extends TestCase
         $this->assertDatabaseCount('worker_tasks', 0);
         Queue::assertNothingPushed();
     }
+
+    public function test_it_rejects_enqueue_when_receipt_migrations_are_disabled(): void
+    {
+        Queue::fake();
+
+        config()->set('workerhub.features.receipts_enabled', false);
+
+        $response = $this->postJson('/api/receipt-migrations', [
+            'receipt_id' => 123,
+            'db_connection' => 'sqlsrv',
+            'source' => 'api',
+        ]);
+
+        $response->assertStatus(503)
+            ->assertJsonPath('accepted', false);
+
+        $this->assertDatabaseCount('worker_tasks', 0);
+        Queue::assertNothingPushed();
+    }
 }

@@ -19,6 +19,8 @@ class InvoiceMigrationControllerTest extends TestCase
 {
     public function test_it_accepts_and_dispatches_an_invoice_migration_using_the_invoice_row_id_as_source_of_truth(): void
     {
+        config()->set('workerhub.features.invoices_enabled', true);
+
         Str::createUuidsUsing(static fn () => '22222222-2222-2222-2222-222222222222');
 
         $resolver = Mockery::mock(WorkerTaskExecutionPlanResolver::class);
