@@ -44,6 +44,7 @@ class ReceiptMigrationNotificationClient
             'task_id' => Arr::get($task, 'task_id'),
             'document_id' => Arr::get($payload, 'document_id'),
             'receipt_id' => Arr::get($payload, 'receipt_id'),
+            'db_connection' => Arr::get($payload, 'db_connection'),
             'company_id' => Arr::get($payload, 'company_id'),
             'client_code' => Arr::get($payload, 'client_code'),
             'client_branch' => Arr::get($payload, 'client_branch'),
