@@ -1,0 +1,13 @@
+resources:
+  - namespace.yaml
+  - web-deployment.yaml
+  - web-service.yaml
+  - migrate-job.yaml
+  - kafka-consumer.yaml
+  - scheduler.yaml
+  - worker-receipts.yaml
+  - worker-sales-orders.yaml
+  - worker-invoices.yaml
+  - worker-general.yaml
+  - worker-integrations.yaml
+  - worker-python-customers.yaml

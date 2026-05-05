@@ -1,0 +1,22 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: workerhub-migrate
+  namespace: workerhub
+spec:
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: migrate
+          image: ghcr.io/comodisimos/workerhub-php-k8s:latest
+          imagePullPolicy: IfNotPresent
+          envFrom:
+            - configMapRef:
+                name: workerhub-config
+            - secretRef:
+                name: workerhub-secrets
+          command:
+            - sh
+            - -lc
+            - php artisan migrate --force

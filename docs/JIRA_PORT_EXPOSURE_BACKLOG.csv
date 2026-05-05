@@ -1,0 +1,2 @@
+Summary,Issue Type,Priority,Labels,Description
+"WorkerHub: exponer aplicacion por puerto 5010 y documentar acceso local","Task","Medium","workerhub,devx,deploy","Ajustar el puerto por defecto del servicio web a 5010 en Docker Compose y documentar la forma exacta de abrir WorkerHub en navegador tanto con Docker como con php artisan serve."

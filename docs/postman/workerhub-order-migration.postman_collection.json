@@ -1,0 +1,101 @@
+{
+  "info": {
+    "name": "WorkerHub Order Migration",
+    "_postman_id": "db4cb0e6-3116-4f57-b7a6-6c4a561fe9d2",
+    "description": "Coleccion para probar la migracion de pedidos y el callback interno de WorkerHub.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Order Migration",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"order_id\": 1411395,\n  \"document_id\": \"002-FC-24116\",\n  \"db_connection\": \"test\",\n  \"operational_center\": \"002\",\n  \"document_type\": \"FC\",\n  \"document_number\": \"24116\",\n  \"company_id\": 2,\n  \"client_code\": \"900123\",\n  \"client_branch\": \"001\",\n  \"order_total\": 120000,\n  \"source\": \"api\",\n  \"priority\": \"default\",\n  \"process_key\": \"sales_orders\",\n  \"process_label\": \"Pedidos\",\n  \"schedule_name\": \"API_ORDER_CREATED\",\n  \"task_name\": \"Migracion pedido POS\",\n  \"metadata\": {\n    \"created_by_user_id\": 184\n  }\n}"
+        },
+        "url": {
+          "raw": "{{WORKERHUB_BASE_URL}}/api/order-migrations",
+          "host": [
+            "{{WORKERHUB_BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "order-migrations"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Order Migrated Callback",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Accept",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "X-WorkerHub-Notification-Token",
+            "value": "{{WORKERHUB_NOTIFICATION_TOKEN}}",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"task_id\": \"task-debug-order-1\",\n  \"document_id\": \"002-FC-24116\",\n  \"order_id\": 1411395,\n  \"company_id\": 2,\n  \"client_code\": \"900123\",\n  \"client_branch\": \"001\",\n  \"order_total\": 120000,\n  \"created_by_user_id\": 184,\n  \"completed_at\": \"2026-04-20T12:00:00-05:00\",\n  \"result\": {\n    \"message\": \"Pedido importado\"\n  }\n}"
+        },
+        "url": {
+          "raw": "{{API_BASE_URL}}/api/internal/workerhub/orders/migrated",
+          "host": [
+            "{{API_BASE_URL}}"
+          ],
+          "path": [
+            "api",
+            "internal",
+            "workerhub",
+            "orders",
+            "migrated"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "WORKERHUB_BASE_URL",
+      "value": "http://192.168.0.26:5010",
+      "type": "string"
+    },
+    {
+      "key": "API_BASE_URL",
+      "value": "https://api3dev.comodisimos.com",
+      "type": "string"
+    },
+    {
+      "key": "WORKERHUB_NOTIFICATION_TOKEN",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

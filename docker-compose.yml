@@ -5,13 +5,14 @@ services:
       context: .
       dockerfile: docker/nginx/Dockerfile
     ports:
-      - "${APP_PORT:-8080}:80"
+      - "${APP_PORT:-5010}:80"
     volumes:
       - ./:/var/www/html
     depends_on:
       - php-1
       - php-2
       - echo-server
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -27,8 +28,15 @@ services:
     depends_on:
       - redis
       - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -41,8 +49,15 @@ services:
     depends_on:
       - redis
       - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 3
+      start_period: 45s
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -51,15 +66,22 @@ services:
     env_file:
       - .env.docker
     command: >
-      sh -lc "php artisan migrate --force &&
+      sh -lc "
       php artisan horizon"
     volumes:
       - ./:/var/www/html
     depends_on:
       - redis
       - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -68,15 +90,167 @@ services:
     env_file:
       - .env.docker
     command: >
-      sh -lc "php artisan migrate --force &&
+      sh -lc "
       php artisan kafka:consume-worker-tasks"
     volumes:
       - ./:/var/www/html
     depends_on:
       - redis
       - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - workerhub
+
+  kafka-consumer-receipts:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan config:clear &&
+      php artisan cache:clear &&
+      
+      php artisan kafka:consume-worker-tasks"
+    environment:
+      KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_RECEIPTS_REQUESTS:-workerhub.tasks.requests.receipts}"
+      KAFKA_CONSUMER_GROUP: "${KAFKA_CONSUMER_GROUP_RECEIPTS:-workerhub-task-consumers-receipts}"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - workerhub
+
+  kafka-consumer-sales-orders:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan config:clear &&
+      php artisan cache:clear &&
+      
+      php artisan kafka:consume-worker-tasks"
+    environment:
+      KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_SALES_ORDERS_REQUESTS:-workerhub.tasks.requests.sales_orders}"
+      KAFKA_CONSUMER_GROUP: "${KAFKA_CONSUMER_GROUP_SALES_ORDERS:-workerhub-task-consumers-sales-orders}"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - workerhub
+
+  kafka-consumer-invoices:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan config:clear &&
+      php artisan cache:clear &&
+      
+      php artisan kafka:consume-worker-tasks"
+    environment:
+      KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_INVOICES_REQUESTS:-workerhub.tasks.requests.invoices}"
+      KAFKA_CONSUMER_GROUP: "${KAFKA_CONSUMER_GROUP_INVOICES:-workerhub-task-consumers-invoices}"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - workerhub
+
+  kafka-consumer-deliveries:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan config:clear &&
+      php artisan cache:clear &&
+      
+      php artisan kafka:consume-worker-tasks"
+    environment:
+      KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_DELIVERIES_REQUESTS:-workerhub.tasks.requests.deliveries}"
+      KAFKA_CONSUMER_GROUP: "${KAFKA_CONSUMER_GROUP_DELIVERIES:-workerhub-task-consumers-deliveries}"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    networks:
+      - workerhub
+
+  kafka-consumer-customers:
+    image: workerhub-php:local
+    env_file:
+      - .env.docker
+    command: >
+      sh -lc "php artisan config:clear &&
+      php artisan cache:clear &&
+      
+      php artisan kafka:consume-worker-tasks"
+    environment:
+      KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_CUSTOMERS_REQUESTS:-workerhub.tasks.requests.customers}"
+      KAFKA_CONSUMER_GROUP: "${KAFKA_CONSUMER_GROUP_CUSTOMERS:-workerhub-task-consumers-customers}"
+    volumes:
+      - ./:/var/www/html
+    depends_on:
+      - redis
+      - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -85,15 +259,22 @@ services:
     env_file:
       - .env.docker
     command: >
-      sh -lc "php artisan migrate --force &&
+      sh -lc "
       php artisan schedule:work"
     volumes:
       - ./:/var/www/html
     depends_on:
       - redis
       - redpanda
+    healthcheck:
+      test: ["CMD-SHELL", "php artisan workerhub:healthcheck > /tmp/workerhub-health.log 2>&1 || exit 1"]
+      interval: 45s
+      timeout: 15s
+      retries: 3
+      start_period: 60s
     extra_hosts:
       - "host.docker.internal:host-gateway"
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -108,6 +289,7 @@ services:
       - "${ECHO_SERVER_PORT_FORWARD:-6001}:6001"
     depends_on:
       - redis
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -117,6 +299,7 @@ services:
       - "${REDIS_FORWARD_PORT:-6381}:6379"
     volumes:
       - workerhub-redis:/data
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -150,6 +333,7 @@ services:
       - "${PANDAPROXY_FORWARD_PORT:-18082}:8082"
     volumes:
       - workerhub-redpanda:/var/lib/redpanda/data
+    restart: unless-stopped
     networks:
       - workerhub
 
@@ -163,6 +347,7 @@ services:
       - "${KAFKA_CONSOLE_PORT:-8081}:8080"
     depends_on:
       - redpanda
+    restart: unless-stopped
     networks:
       - workerhub
 
