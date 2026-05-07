@@ -38,6 +38,7 @@ class ReceiptPreMigrationGuard
                     'wompi_expired_without_payment',
                     'document_type_A06',
                     'document_type_RCP',
+                    'legacy_export_verified',
                 ],
             ]
         );
@@ -54,6 +55,7 @@ class ReceiptPreMigrationGuard
             || $snapshot->isCancelled
             || $snapshot->isCancellationRequested
             || $snapshot->isWompiExpiredWithoutPayment
+            || $snapshot->isLegacyExportVerified
             || in_array($snapshot->documentType, ['A06', 'RCP'], true);
     }
 }

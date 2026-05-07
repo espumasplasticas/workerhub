@@ -156,6 +156,11 @@ return [
             'header' => env('WORKERHUB_RECEIPT_HEADER_VIEW', 'prototipos.v_prototipos_recibos_encabezado_sala_ventas'),
             'payments' => env('WORKERHUB_RECEIPT_PAYMENTS_VIEW', 'prototipos.v_prototipos_recibos_caja'),
         ],
+        'prototype' => [
+            'document_type_overrides' => [
+                'A79' => env('WORKERHUB_RECEIPT_PROTOTYPE_DOCUMENT_TYPE_A79', 'RS'),
+            ],
+        ],
         'pre_migration' => [
             'enabled' => filter_var(env('WORKERHUB_RECEIPT_PRE_MIGRATION_ENABLED', true), FILTER_VALIDATE_BOOL),
             'table' => env('WORKERHUB_RECEIPT_TABLE', 'pos.recibos_encabezado'),

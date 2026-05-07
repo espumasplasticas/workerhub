@@ -70,6 +70,38 @@ class ReceiptPreMigrationGuardTest extends TestCase
         $this->assertSame('RCP', $snapshot->documentType);
     }
 
+    public function test_it_allows_legacy_verified_receipts_even_without_full_legalization(): void
+    {
+        $provider = Mockery::mock(ReceiptPreMigrationDataSourceInterface::class);
+        $provider->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new ReceiptPreMigrationSnapshot(
+                operationalCenter: '001',
+                documentType: 'A79',
+                documentNumber: '76',
+                totalAmount: 1017450,
+                legalizedAmount: 0,
+                isCancelled: false,
+                isCancellationRequested: false,
+                isWompiExpiredWithoutPayment: false,
+                isLegacyMigrated: true,
+                isLegacyExportVerified: true,
+            ));
+
+        $config = Mockery::mock(Repository::class);
+        $config->shouldReceive('get')
+            ->once()
+            ->with('workerhub.receipts.pre_migration.enabled', true)
+            ->andReturn(true);
+
+        $guard = new ReceiptPreMigrationGuard($provider, $config);
+
+        $snapshot = $guard->assertCanMigrate(['document_id' => '001-A79-76']);
+
+        $this->assertSame('001-A79-76', $snapshot->reference());
+        $this->assertTrue($snapshot->isLegacyExportVerified);
+    }
+
     public function test_it_rejects_receipts_that_do_not_meet_any_precondition(): void
     {
         $provider = Mockery::mock(ReceiptPreMigrationDataSourceInterface::class);
