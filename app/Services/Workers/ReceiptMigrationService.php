@@ -40,36 +40,30 @@ class ReceiptMigrationService
         };
 
         $preMigrationSnapshot = $measure('pre_migration_guard', fn () => $this->preMigrationGuard->assertCanMigrate($payload));
+
+        if ($preMigrationSnapshot->isLegacyExportVerified) {
+            return $this->alreadyMigratedResult(
+                payload: $payload,
+                preMigrationSnapshot: $preMigrationSnapshot,
+                siesaState: null,
+                timings: $timings,
+                reason: 'receipt_legacy_export_verified'
+            );
+        }
+
         $header = $measure('find_header', fn () => $this->repository->findHeader($payload));
         $siesaStateBefore = $measure('fetch_siesa_state_before', fn () => $this->siesaStateService->fetch($payload, $header));
 
         if ($siesaStateBefore->exists) {
             $measure('mark_detected_in_siesa', fn () => $this->legacyStateService->markDetectedInSiesa($payload));
 
-            return [
-                'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
-                'source' => $payload['source'] ?? null,
-                'message' => 'El recibo ya existe en Siesa. Se sincronizaron indicadores legacy y se omite la retransmision.',
-                'errors' => [],
-                'siesa_web_service' => null,
-                'import_payload' => null,
-                'line_count' => 0,
-                'receipt_line_count' => 0,
-                'customer_sync_line_count' => 0,
-                'payment_count' => 0,
-                'receipt_reference' => $this->buildReference($payload),
-                'pre_migration' => $preMigrationSnapshot->toArray(),
-                'cross_reference' => null,
-                'customer_sync' => [
-                    'status' => 'skipped',
-                    'line_count' => 0,
-                    'lines' => [],
-                    'reason' => 'receipt_already_exists_in_siesa',
-                ],
-                'siesa_state' => $siesaStateBefore->toArray(),
-                'already_migrated' => true,
-                'timings_ms' => $timings,
-            ];
+            return $this->alreadyMigratedResult(
+                payload: $payload,
+                preMigrationSnapshot: $preMigrationSnapshot,
+                siesaState: $siesaStateBefore,
+                timings: $timings,
+                reason: 'receipt_already_exists_in_siesa'
+            );
         }
 
         $measure('validate_soap_configuration', fn () => $this->soapConfigurationValidator->validate());
@@ -154,5 +148,38 @@ class ReceiptMigrationService
             trim((string) ($payload['document_type'] ?? '')),
             trim((string) ($payload['document_number'] ?? '')),
         ], static fn (string $value): bool => $value !== ''));
+    }
+
+    private function alreadyMigratedResult(
+        array $payload,
+        \App\Data\Receipts\ReceiptPreMigrationSnapshot $preMigrationSnapshot,
+        ?\App\Data\Receipts\ReceiptSiesaStateSnapshot $siesaState,
+        array $timings,
+        string $reason
+    ): array {
+        return [
+            'document_id' => $payload['document_id'] ?? $this->buildReference($payload),
+            'source' => $payload['source'] ?? null,
+            'message' => 'El recibo ya fue migrado/verificado. Se omite la retransmision.',
+            'errors' => [],
+            'siesa_web_service' => null,
+            'import_payload' => null,
+            'line_count' => 0,
+            'receipt_line_count' => 0,
+            'customer_sync_line_count' => 0,
+            'payment_count' => 0,
+            'receipt_reference' => $this->buildReference($payload),
+            'pre_migration' => $preMigrationSnapshot->toArray(),
+            'cross_reference' => null,
+            'customer_sync' => [
+                'status' => 'skipped',
+                'line_count' => 0,
+                'lines' => [],
+                'reason' => $reason,
+            ],
+            'siesa_state' => $siesaState?->toArray(),
+            'already_migrated' => true,
+            'timings_ms' => $timings,
+        ];
     }
 }

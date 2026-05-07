@@ -41,9 +41,14 @@ class ReceiptLegacyStateService
             return;
         }
 
-        $this->receiptQuery($payload)->update([
-            'RE_IndicadorMigrado' => 0,
-        ]);
+        $this->receiptQuery($payload)
+            ->where(function ($query): void {
+                $query->whereNull('RE_EstadoVerificadoExportacion')
+                    ->orWhere('RE_EstadoVerificadoExportacion', '<>', 2);
+            })
+            ->update([
+                'RE_IndicadorMigrado' => 0,
+            ]);
     }
 
     public function markMigrated(array $payload): void
