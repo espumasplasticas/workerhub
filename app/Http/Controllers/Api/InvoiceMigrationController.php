@@ -34,6 +34,13 @@ class InvoiceMigrationController extends Controller
         // Other reference fields (document_id, operational_center, ...) are removed
         // to keep the request minimal — WorkerHub will hydrate them server-side
         // using `invoice_id`.
+        if (!config('workerhub.features.invoices_enabled', true)) {
+            return response()->json([
+                'accepted' => false,
+                'message' => 'Invoice migrations are disabled by configuration.',
+            ], 503);
+        }
+
         $validated = $request->validate([
             'invoice_id' => ['required', 'integer'],
             'db_connection' => ['required', 'string'],

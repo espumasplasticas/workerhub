@@ -30,6 +30,8 @@ class SqlReceiptPreMigrationDataSource implements ReceiptPreMigrationDataSourceI
                 'RE_ValorTotal',
                 'RE_IndicadorAnulado',
                 'RE_IndicadorSolicitudAnular',
+                'RE_IndicadorMigrado',
+                'RE_EstadoVerificadoExportacion',
             ])
             ->where('RE_CentroOperativo', $reference['operational_center'])
             ->where('RE_TipoDocumento', $reference['document_type'])
@@ -74,6 +76,8 @@ class SqlReceiptPreMigrationDataSource implements ReceiptPreMigrationDataSourceI
             isCancellationRequested: (int) ($receipt->RE_IndicadorSolicitudAnular ?? 0) === 1,
             isWompiExpiredWithoutPayment: $isExpiredWithoutPayment,
             servicreditoPaymentCount: 0,
+            isLegacyMigrated: (int) ($receipt->RE_IndicadorMigrado ?? 0) === 1,
+            isLegacyExportVerified: (int) ($receipt->RE_EstadoVerificadoExportacion ?? 0) === 2,
         );
     }
 

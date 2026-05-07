@@ -66,7 +66,7 @@ services:
     env_file:
       - .env.docker
     command: >
-      sh -lc "
+      sh -lc "php artisan migrate --force &&
       php artisan horizon"
     volumes:
       - ./:/var/www/html
@@ -90,7 +90,7 @@ services:
     env_file:
       - .env.docker
     command: >
-      sh -lc "
+      sh -lc "php artisan migrate --force &&
       php artisan kafka:consume-worker-tasks"
     volumes:
       - ./:/var/www/html
@@ -116,7 +116,7 @@ services:
     command: >
       sh -lc "php artisan config:clear &&
       php artisan cache:clear &&
-      
+      php artisan migrate --force &&
       php artisan kafka:consume-worker-tasks"
     environment:
       KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_RECEIPTS_REQUESTS:-workerhub.tasks.requests.receipts}"
@@ -145,7 +145,7 @@ services:
     command: >
       sh -lc "php artisan config:clear &&
       php artisan cache:clear &&
-      
+      php artisan migrate --force &&
       php artisan kafka:consume-worker-tasks"
     environment:
       KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_SALES_ORDERS_REQUESTS:-workerhub.tasks.requests.sales_orders}"
@@ -174,7 +174,7 @@ services:
     command: >
       sh -lc "php artisan config:clear &&
       php artisan cache:clear &&
-      
+      php artisan migrate --force &&
       php artisan kafka:consume-worker-tasks"
     environment:
       KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_INVOICES_REQUESTS:-workerhub.tasks.requests.invoices}"
@@ -203,7 +203,7 @@ services:
     command: >
       sh -lc "php artisan config:clear &&
       php artisan cache:clear &&
-      
+      php artisan migrate --force &&
       php artisan kafka:consume-worker-tasks"
     environment:
       KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_DELIVERIES_REQUESTS:-workerhub.tasks.requests.deliveries}"
@@ -232,7 +232,7 @@ services:
     command: >
       sh -lc "php artisan config:clear &&
       php artisan cache:clear &&
-      
+      php artisan migrate --force &&
       php artisan kafka:consume-worker-tasks"
     environment:
       KAFKA_TOPIC_REQUESTS: "${KAFKA_TOPIC_CUSTOMERS_REQUESTS:-workerhub.tasks.requests.customers}"
@@ -259,7 +259,7 @@ services:
     env_file:
       - .env.docker
     command: >
-      sh -lc "
+      sh -lc "php artisan migrate --force &&
       php artisan schedule:work"
     volumes:
       - ./:/var/www/html

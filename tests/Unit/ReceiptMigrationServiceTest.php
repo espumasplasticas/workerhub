@@ -380,6 +380,86 @@ class ReceiptMigrationServiceTest extends TestCase
         $this->assertArrayHasKey('timings_ms', $result);
     }
 
+    public function test_it_resolves_when_the_receipt_was_verified_by_legacy(): void
+    {
+        $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldNotReceive('findHeader');
+        $repository->shouldNotReceive('findPayments');
+
+        $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
+        $validator->shouldNotReceive('validate');
+
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldNotReceive('registerPreparedReceiptCustomerAttempts');
+        $importAttemptControl->shouldNotReceive('registerReceiptMigrationAttempt');
+
+        $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->andReturn(new ReceiptPreMigrationSnapshot(
+                operationalCenter: '001',
+                documentType: 'A79',
+                documentNumber: '76',
+                totalAmount: 1017450,
+                legalizedAmount: 0,
+                isCancelled: false,
+                isCancellationRequested: false,
+                isWompiExpiredWithoutPayment: false,
+                isLegacyMigrated: true,
+                isLegacyExportVerified: true,
+            ));
+
+        $customerSync = Mockery::mock(ReceiptCustomerSyncService::class);
+        $customerSync->shouldNotReceive('sync');
+
+        $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
+        $crossReferenceGuard->shouldNotReceive('assertExists');
+
+        $lineFactory = Mockery::mock(ReceiptLineFactory::class);
+        $lineFactory->shouldNotReceive('build');
+
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldNotReceive('fetch');
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldNotReceive('markMigrationStarted');
+        $legacyState->shouldNotReceive('markMigrationFailed');
+        $legacyState->shouldNotReceive('markMigrated');
+        $legacyState->shouldNotReceive('markDetectedInSiesa');
+
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldNotReceive('import');
+
+        $service = new ReceiptMigrationService(
+            $auditService,
+            $validator,
+            $importAttemptControl,
+            $guard,
+            $repository,
+            $crossReferenceGuard,
+            $customerSync,
+            $lineFactory,
+            $siesaStateService,
+            $legacyState
+        );
+
+        $result = $service->handle([
+            'document_id' => '001-A79-76',
+            'source' => 'api',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'A79',
+            'document_number' => '76',
+        ]);
+
+        $this->assertSame('001-A79-76', $result['document_id']);
+        $this->assertTrue($result['already_migrated']);
+        $this->assertSame('receipt_legacy_export_verified', $result['customer_sync']['reason']);
+        $this->assertTrue($result['pre_migration']['is_legacy_export_verified']);
+        $this->assertNull($result['siesa_state']);
+        $this->assertArrayHasKey('timings_ms', $result);
+    }
+
     /**
      * @return list<string>
      */

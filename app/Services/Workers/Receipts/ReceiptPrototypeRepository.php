@@ -33,7 +33,7 @@ class ReceiptPrototypeRepository
             );
         }
 
-        return $record;
+        return $this->normalizePrototypeDocumentType($record);
     }
 
     /**
@@ -112,7 +112,10 @@ class ReceiptPrototypeRepository
             );
         }
 
-        return $records;
+        return array_map(
+            fn (stdClass $record): stdClass => $this->normalizePrototypeDocumentType($record),
+            $records
+        );
     }
 
     /**
@@ -189,5 +192,18 @@ class ReceiptPrototypeRepository
     private function sourceReceiptTable(): string
     {
         return (string) $this->config->get('workerhub.receipts.pre_migration.table', 'pos.recibos_encabezado');
+    }
+
+    private function normalizePrototypeDocumentType(stdClass $record): stdClass
+    {
+        $sourceDocumentType = strtoupper(trim((string) ($record->RE_TipoDocumento ?? $record->F350_ID_TIPO_DOCTO ?? '')));
+        $overrides = (array) $this->config->get('workerhub.receipts.prototype.document_type_overrides', []);
+        $targetDocumentType = trim((string) ($overrides[$sourceDocumentType] ?? ''));
+
+        if ($targetDocumentType !== '') {
+            $record->F350_ID_TIPO_DOCTO = $targetDocumentType;
+        }
+
+        return $record;
     }
 }
