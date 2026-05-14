@@ -164,12 +164,18 @@ class WorkerTaskReplayEligibilityService
 
             $cancellationRequested = $task->type === 'receipt_cancellation';
 
-            if ($siesaState->exists && (!$cancellationRequested || (int) ($siesaState->stateIndicator ?? 0) === 2)) {
+            if (!$cancellationRequested && $siesaState->exists) {
+                return [
+                    'can_retry' => true,
+                    'reason' => null,
+                    'siesa_state' => $siesaState->toArray(),
+                ];
+            }
+
+            if ($cancellationRequested && $siesaState->exists && (int) ($siesaState->stateIndicator ?? 0) === 2) {
                 return [
                     'can_retry' => false,
-                    'reason' => $cancellationRequested
-                        ? 'El recibo ya esta anulado en Siesa y no debe reencolarse.'
-                        : 'El recibo ya existe en Siesa y no debe reencolarse.',
+                    'reason' => 'El recibo ya esta anulado en Siesa y no debe reencolarse.',
                     'siesa_state' => $siesaState->toArray(),
                 ];
             }

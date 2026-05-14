@@ -134,7 +134,7 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
         $this->assertSame(4, $result['siesa_state']['state_indicator']);
     }
 
-    public function test_it_blocks_replay_when_receipt_already_exists_in_siesa(): void
+    public function test_it_allows_receipt_migration_replay_when_receipt_already_exists_in_siesa(): void
     {
         $task = new WorkerTask([
             'id' => 'task-1',
@@ -187,8 +187,8 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
         );
         $result = $service->inspect($task);
 
-        $this->assertFalse($result['can_retry']);
-        $this->assertSame('El recibo ya existe en Siesa y no debe reencolarse.', $result['reason']);
+        $this->assertTrue($result['can_retry']);
+        $this->assertNull($result['reason']);
         $this->assertTrue($result['siesa_state']['exists']);
     }
 
