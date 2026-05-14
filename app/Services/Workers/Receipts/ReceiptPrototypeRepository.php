@@ -9,6 +9,11 @@ use stdClass;
 
 class ReceiptPrototypeRepository
 {
+    /**
+     * @var array<string, string>
+     */
+    private array $enterpriseDocumentTypeCache = [];
+
     public function __construct(
         private readonly DatabaseManager $database,
         private readonly Repository $config
@@ -33,7 +38,7 @@ class ReceiptPrototypeRepository
             );
         }
 
-        return $this->normalizePrototypeDocumentType($record);
+        return $this->normalizePrototypeDocumentType($record, $reference['db_connection']);
     }
 
     /**
@@ -113,7 +118,7 @@ class ReceiptPrototypeRepository
         }
 
         return array_map(
-            fn (stdClass $record): stdClass => $this->normalizePrototypeDocumentType($record),
+            fn (stdClass $record): stdClass => $this->normalizePrototypeDocumentType($record, $reference['db_connection']),
             $records
         );
     }
@@ -194,16 +199,70 @@ class ReceiptPrototypeRepository
         return (string) $this->config->get('workerhub.receipts.pre_migration.table', 'pos.recibos_encabezado');
     }
 
-    private function normalizePrototypeDocumentType(stdClass $record): stdClass
+    private function normalizePrototypeDocumentType(stdClass $record, string $sourceConnection): stdClass
     {
         $sourceDocumentType = strtoupper(trim((string) ($record->RE_TipoDocumento ?? $record->F350_ID_TIPO_DOCTO ?? '')));
         $overrides = (array) $this->config->get('workerhub.receipts.prototype.document_type_overrides', []);
         $targetDocumentType = trim((string) ($overrides[$sourceDocumentType] ?? ''));
+
+        if ($targetDocumentType === '') {
+            $targetDocumentType = $this->resolveLegacyEnterpriseDocumentType($record, $sourceConnection);
+        }
 
         if ($targetDocumentType !== '') {
             $record->F350_ID_TIPO_DOCTO = $targetDocumentType;
         }
 
         return $record;
+    }
+
+    private function resolveLegacyEnterpriseDocumentType(stdClass $record, string $sourceConnection): string
+    {
+        $enterpriseCo = trim((string) ($record->F350_ID_CO ?? $record->RE_CentroOperativo ?? ''));
+        $storeCode = trim((string) ($record->RE_CodigoSalaDeVentas ?? ''));
+
+        if ($enterpriseCo === '' && $storeCode === '') {
+            return '';
+        }
+
+        $cacheKey = $sourceConnection . '|' . $enterpriseCo . '|' . $storeCode;
+        if (array_key_exists($cacheKey, $this->enterpriseDocumentTypeCache)) {
+            return $this->enterpriseDocumentTypeCache[$cacheKey];
+        }
+
+        $activationTable = (string) $this->config->get(
+            'workerhub.receipts.prototype.activation_table',
+            'contabilidad.er_salas_fechas_activacion'
+        );
+        $salesTable = (string) $this->config->get(
+            'workerhub.receipts.prototype.sales_table',
+            'pos.salas_informacion_adicional'
+        );
+
+        $row = $this->connectionFor($sourceConnection)
+            ->table($activationTable . ' as activation')
+            ->leftJoin($salesTable . ' as sale', 'activation.FC_co', '=', 'sale.SA_CentroOperativoEnterprise')
+            ->when($storeCode !== '', fn ($query) => $query->where('sale.SA_Id', $storeCode))
+            ->when($storeCode === '' && $enterpriseCo !== '', fn ($query) => $query->where('activation.FC_co', $enterpriseCo))
+            ->select([
+                'activation.FC_lapso_apertura',
+                'sale.SA_PedidoPrefijo',
+            ])
+            ->first();
+
+        $targetDocumentType = '';
+        if ($row instanceof stdClass) {
+            $activationLapso = (int) ($row->FC_lapso_apertura ?? 0);
+            $threshold = (int) $this->config->get('workerhub.receipts.prototype.enterprise_activation_lapso_threshold', 202011);
+
+            if ($activationLapso >= $threshold) {
+                $targetDocumentType = (string) $this->config->get('workerhub.receipts.prototype.enterprise_receipt_document_type', 'RS');
+            } else {
+                $prefix = strtoupper(trim((string) ($row->SA_PedidoPrefijo ?? '')));
+                $targetDocumentType = $prefix !== '' ? 'R' . $prefix : '';
+            }
+        }
+
+        return $this->enterpriseDocumentTypeCache[$cacheKey] = $targetDocumentType;
     }
 }

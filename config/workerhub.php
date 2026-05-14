@@ -157,6 +157,10 @@ return [
             'payments' => env('WORKERHUB_RECEIPT_PAYMENTS_VIEW', 'prototipos.v_prototipos_recibos_caja'),
         ],
         'prototype' => [
+            'activation_table' => env('WORKERHUB_RECEIPT_PROTOTYPE_ACTIVATION_TABLE', 'contabilidad.er_salas_fechas_activacion'),
+            'sales_table' => env('WORKERHUB_RECEIPT_PROTOTYPE_SALES_TABLE', 'pos.salas_informacion_adicional'),
+            'enterprise_activation_lapso_threshold' => (int) env('WORKERHUB_RECEIPT_PROTOTYPE_ENTERPRISE_LAPSO_THRESHOLD', 202011),
+            'enterprise_receipt_document_type' => env('WORKERHUB_RECEIPT_PROTOTYPE_ENTERPRISE_DOCUMENT_TYPE', 'RS'),
             'document_type_overrides' => [
                 'A79' => env('WORKERHUB_RECEIPT_PROTOTYPE_DOCUMENT_TYPE_A79', 'RS'),
             ],
