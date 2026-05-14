@@ -21,7 +21,7 @@ class DocumentImportAttemptControlServiceTest extends TestCase
                 Mockery::on(static fn (string $sql): bool => str_contains($sql, 'MERGE pos.control_importacion_documentos AS target')),
                 Mockery::on(static fn (array $bindings): bool => $bindings[0] === '002'
                     && $bindings[1] === 'CLI'
-                    && $bindings[2] === '900123-00')
+                    && $bindings[2] === '900123')
             )
             ->andReturn(1);
         $connection->shouldReceive('affectingStatement')
@@ -83,7 +83,7 @@ class DocumentImportAttemptControlServiceTest extends TestCase
                 Mockery::on(static fn (string $sql): bool => str_contains($sql, 'MERGE pos.control_importacion_documentos AS target')),
                 Mockery::on(static fn (array $bindings): bool => $bindings[0] === '001'
                     && $bindings[1] === 'CLI'
-                    && $bindings[2] === '456789-06')
+                    && $bindings[2] === '456789')
             )
             ->andReturn(1);
         $connection->shouldReceive('affectingStatement')
@@ -138,7 +138,7 @@ class DocumentImportAttemptControlServiceTest extends TestCase
                 Mockery::on(static fn (string $sql): bool => str_contains($sql, 'MERGE pos.control_importacion_documentos AS target')),
                 Mockery::on(static fn (array $bindings): bool => $bindings[0] === '002'
                     && $bindings[1] === 'CLI'
-                    && $bindings[2] === '900555-01')
+                    && $bindings[2] === '900555')
             )
             ->andReturn(1);
         $connection->shouldReceive('selectOne')

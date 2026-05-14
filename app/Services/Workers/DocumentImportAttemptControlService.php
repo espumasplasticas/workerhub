@@ -128,7 +128,7 @@ class DocumentImportAttemptControlService
                 $connectionName,
                 $operationalCenter,
                 $this->customerAttemptDocumentType(),
-                $preparedCustomer['third_party_id'] . '-' . $preparedCustomer['source_branch']
+                $preparedCustomer['third_party_id']
             );
         }
     }
