@@ -95,6 +95,26 @@ class ReceiptMigrationService
             $result = $audit->result;
 
             if (!$result->success) {
+                if ($this->isReceiptAlreadyUpdatedByAnotherImport($result->errors)) {
+                    $siesaStateAfterConflict = $measure(
+                        'fetch_siesa_state_after_concurrent_import',
+                        fn () => $this->siesaStateService->fetch($payload, $header)
+                    );
+
+                    if ($siesaStateAfterConflict->exists) {
+                        $measure('mark_detected_in_siesa_after_concurrent_import', fn () => $this->legacyStateService->markDetectedInSiesa($payload));
+                        $importSucceeded = true;
+
+                        return $this->alreadyMigratedResult(
+                            payload: $payload,
+                            preMigrationSnapshot: $preMigrationSnapshot,
+                            siesaState: $siesaStateAfterConflict,
+                            timings: $timings,
+                            reason: 'receipt_already_updated_by_another_import'
+                        );
+                    }
+                }
+
                 throw new WorkerTaskProcessingException(
                     $result->message,
                     [
@@ -139,6 +159,51 @@ class ReceiptMigrationService
 
             throw $exception;
         }
+    }
+
+    /**
+     * Siesa responde este error cuando otro worker importo el mismo recibo entre
+     * la validacion inicial y el envio del XML. En ese caso el flujo debe ser
+     * idempotente, no fallido.
+     *
+     * @param mixed $errors
+     */
+    private function isReceiptAlreadyUpdatedByAnotherImport(mixed $errors): bool
+    {
+        $text = $this->flattenImportErrors($errors);
+        $normalized = strtr(mb_strtolower($text), [
+            'á' => 'a',
+            'é' => 'e',
+            'í' => 'i',
+            'ó' => 'o',
+            'ú' => 'u',
+        ]);
+
+        return str_contains($normalized, 'recibo de caja')
+            && str_contains($normalized, 'ya fue actualizado por otra importacion');
+    }
+
+    /**
+     * @param mixed $value
+     */
+    private function flattenImportErrors(mixed $value): string
+    {
+        if (is_scalar($value) || $value === null) {
+            return trim((string) $value);
+        }
+
+        if (is_object($value)) {
+            $value = get_object_vars($value);
+        }
+
+        if (!is_array($value)) {
+            return '';
+        }
+
+        return trim(implode(' ', array_map(
+            fn (mixed $item): string => $this->flattenImportErrors($item),
+            $value
+        )));
     }
 
     private function buildReference(array $payload): string

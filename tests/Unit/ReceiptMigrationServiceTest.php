@@ -301,6 +301,119 @@ class ReceiptMigrationServiceTest extends TestCase
         ]);
     }
 
+    public function test_it_resolves_when_siesa_reports_the_receipt_was_updated_by_another_import(): void
+    {
+        $repository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $repository->shouldReceive('findHeader')->once()->andReturn((object) [
+            'F350_ID_CO' => '001',
+            'F350_ID_TIPO_DOCTO' => 'RX',
+            'F350_CONSEC_DOCTO' => '1001',
+        ]);
+        $repository->shouldReceive('findPayments')->once()->andReturn([new stdClass()]);
+
+        $validator = Mockery::mock(EpsaSoapConfigurationValidator::class);
+        $validator->shouldReceive('validate')->once();
+
+        $importAttemptControl = Mockery::mock(DocumentImportAttemptControlService::class);
+        $importAttemptControl->shouldReceive('registerPreparedReceiptCustomerAttempts')->once();
+        $importAttemptControl->shouldReceive('registerReceiptMigrationAttempt')->once();
+
+        $guard = Mockery::mock(ReceiptPreMigrationGuard::class);
+        $guard->shouldReceive('assertCanMigrate')
+            ->once()
+            ->andReturn(new ReceiptPreMigrationSnapshot(
+                operationalCenter: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                totalAmount: 100000,
+                legalizedAmount: 100000,
+                isCancelled: false,
+                isCancellationRequested: false,
+                isWompiExpiredWithoutPayment: false,
+            ));
+
+        $customerSync = Mockery::mock(ReceiptCustomerSyncService::class);
+        $customerSync->shouldReceive('sync')
+            ->once()
+            ->andReturn([
+                'status' => 'skipped',
+                'line_count' => 0,
+                'lines' => [],
+                'parties' => [],
+            ]);
+
+        $crossReferenceGuard = Mockery::mock(ReceiptCrossReferenceGuard::class);
+        $crossReferenceGuard->shouldReceive('assertExists')
+            ->once()
+            ->andReturn(new ReceiptCrossReferenceSnapshot(
+                auxiliaryId: '28050505',
+                operationalCenter: '001',
+                unit: '02',
+                branch: '001',
+                documentType: 'RX',
+                documentNumber: '1001',
+                exists: true,
+            ));
+
+        $lineFactory = Mockery::mock(ReceiptLineFactory::class);
+        $lineFactory->shouldReceive('build')->once()->andReturn(['035700...', '035701...']);
+
+        $siesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $siesaStateService->shouldReceive('fetch')
+            ->twice()
+            ->andReturn(
+                new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', false, '001', 'RX', '1001'),
+                new \App\Data\Receipts\ReceiptSiesaStateSnapshot('001', 'RX', '1001', true, '001', 'RX', '1001', 100000.0, 0.0, 1)
+            );
+
+        $legacyState = Mockery::mock(ReceiptLegacyStateService::class);
+        $legacyState->shouldReceive('markMigrationStarted')->once();
+        $legacyState->shouldReceive('markDetectedInSiesa')->once();
+        $legacyState->shouldNotReceive('markMigrationFailed');
+        $legacyState->shouldNotReceive('markMigrated');
+
+        $auditService = Mockery::mock(SiesaImportAuditService::class);
+        $auditService->shouldReceive('import')
+            ->once()
+            ->andReturn(new SiesaImportAuditResult(
+                new SiesaWebServiceLogRecord(203, '<Envelope />', ['import_stage' => 'receipt_migration']),
+                new ImportResult(false, 'Fallo importando recibo', [[
+                    'linea' => '2',
+                    'tipo' => '0357',
+                    'subtipo' => '00',
+                    'version' => '01',
+                    'nivel' => '01',
+                    'valor' => 'D03-RA5-00008359',
+                    'detalle' => 'Recibo de caja: El recibo de caja no fue procesado porque ya fue actualizado por otra importación.',
+                ]], '<Envelope />')
+            ));
+
+        $service = new ReceiptMigrationService(
+            $auditService,
+            $validator,
+            $importAttemptControl,
+            $guard,
+            $repository,
+            $crossReferenceGuard,
+            $customerSync,
+            $lineFactory,
+            $siesaStateService,
+            $legacyState
+        );
+
+        $result = $service->handle([
+            'document_id' => '001-RX-1001',
+            'db_connection' => 'sqlsrv',
+            'operational_center' => '001',
+            'document_type' => 'RX',
+            'document_number' => '1001',
+        ]);
+
+        $this->assertTrue($result['already_migrated']);
+        $this->assertSame('receipt_already_updated_by_another_import', $result['customer_sync']['reason']);
+        $this->assertTrue($result['siesa_state']['exists']);
+    }
+
     public function test_it_resolves_when_the_receipt_already_exists_in_siesa(): void
     {
         $repository = Mockery::mock(ReceiptPrototypeRepository::class);
