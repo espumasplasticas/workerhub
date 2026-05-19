@@ -121,6 +121,10 @@ class DispatchWorkerTaskJob implements ShouldQueue
                 return;
             }
 
+            if (!Arr::get($this->task, 'result.siesa_state.exists', false)) {
+                return;
+            }
+
             $notificationClient->notifyReceiptMigrated($this->task);
 
             if ($taskId !== '') {

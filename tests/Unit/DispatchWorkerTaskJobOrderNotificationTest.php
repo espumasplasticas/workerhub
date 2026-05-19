@@ -80,4 +80,67 @@ class DispatchWorkerTaskJobOrderNotificationTest extends TestCase
             $receiptNotificationClient
         );
     }
+
+    public function test_it_does_not_notify_api_after_receipt_migration_when_receipt_is_not_found_in_siesa(): void
+    {
+        $task = [
+            'task_id' => 'task-receipt-notify-skipped',
+            'type' => 'receipt_migration',
+            'payload' => [
+                'document_id' => 'A82-RCP-2829',
+                'source' => 'api',
+                'created_by_user_id' => 184,
+            ],
+        ];
+
+        $result = [
+            'document_id' => 'A82-RCP-2829',
+            'message' => 'Recibo enviado a Siesa',
+            'siesa_state' => [
+                'exists' => false,
+            ],
+        ];
+
+        $router = Mockery::mock(WorkerTaskRouter::class);
+        $router->shouldReceive('handle')
+            ->once()
+            ->with($task)
+            ->andReturn($result);
+        $router->shouldNotReceive('resolveExecutionPlan');
+
+        $dispatcher = Mockery::mock(WorkerTaskDispatchService::class);
+        $dispatcher->shouldNotReceive('dispatch');
+
+        $monitor = Mockery::mock(WorkerTaskMonitorService::class);
+        $monitor->shouldReceive('markProcessing')->once()->with('task-receipt-notify-skipped', 1);
+        $monitor->shouldReceive('markCompleted')->once()->with('task-receipt-notify-skipped', $result);
+        $monitor->shouldNotReceive('addEvent');
+
+        $orderNotificationClient = Mockery::mock(OrderMigrationNotificationClient::class);
+        $orderNotificationClient->shouldNotReceive('notifyOrderMigrated');
+
+        $invoiceNotificationClient = Mockery::mock(InvoiceMigrationNotificationClient::class);
+        $invoiceNotificationClient->shouldNotReceive('notifyInvoiceMigrated');
+
+        $orderCancellationNotificationClient = Mockery::mock(OrderCancellationNotificationClient::class);
+        $orderCancellationNotificationClient->shouldNotReceive('notifyOrderCancelled');
+
+        $receiptCancellationNotificationClient = Mockery::mock(ReceiptCancellationNotificationClient::class);
+        $receiptCancellationNotificationClient->shouldNotReceive('notifyReceiptCancelled');
+
+        $receiptNotificationClient = Mockery::mock(ReceiptMigrationNotificationClient::class);
+        $receiptNotificationClient->shouldNotReceive('notifyReceiptMigrated');
+
+        $job = new DispatchWorkerTaskJob($task);
+        $job->handle(
+            $router,
+            $dispatcher,
+            $monitor,
+            $invoiceNotificationClient,
+            $orderCancellationNotificationClient,
+            $orderNotificationClient,
+            $receiptCancellationNotificationClient,
+            $receiptNotificationClient
+        );
+    }
 }
