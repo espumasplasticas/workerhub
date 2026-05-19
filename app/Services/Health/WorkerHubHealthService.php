@@ -104,6 +104,7 @@ class WorkerHubHealthService
         try {
             $count = WorkerTask::query()
                 ->whereIn('status', ['failed', 'rejected'])
+                ->whereNull('replayed_at')
                 ->count();
             $threshold = max(1, (int) config('workerhub.health.dead_letters_alert_threshold', 25));
 
