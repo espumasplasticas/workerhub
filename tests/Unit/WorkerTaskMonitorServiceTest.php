@@ -123,6 +123,34 @@ class WorkerTaskMonitorServiceTest extends TestCase
         $this->assertSame('task-replay-hit', $result->items()[0]->getKey());
     }
 
+    public function test_it_normalizes_a_single_day_date_filter_to_that_same_day(): void
+    {
+        WorkerTask::query()->create([
+            'id' => 'task-today',
+            'type' => 'document_migration',
+            'status' => 'completed',
+            'priority' => 'default',
+            'requested_at' => now()->setTime(9, 30),
+        ]);
+
+        WorkerTask::query()->create([
+            'id' => 'task-yesterday',
+            'type' => 'document_migration',
+            'status' => 'completed',
+            'priority' => 'default',
+            'requested_at' => now()->subDay()->setTime(9, 30),
+        ]);
+
+        $filters = MonitorTaskFilters::fromArray([
+            'date_from' => now()->toDateString(),
+        ]);
+
+        $result = app(WorkerTaskMonitorService::class)->listTasks($filters, 25);
+
+        $this->assertSame(1, $result->total());
+        $this->assertSame('task-today', $result->items()[0]->getKey());
+    }
+
     public function test_it_includes_process_summary_counts(): void
     {
         WorkerTask::query()->create([

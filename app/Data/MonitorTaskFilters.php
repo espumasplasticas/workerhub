@@ -27,6 +27,17 @@ final class MonitorTaskFilters
      */
     public static function fromArray(array $filters, bool $onlyDeadLetters = false): self
     {
+        $dateFrom = $filters['date_from'] ?? null;
+        $dateTo = $filters['date_to'] ?? null;
+
+        if (is_string($dateFrom) && trim($dateFrom) !== '' && (!is_string($dateTo) || trim($dateTo) === '')) {
+            $dateTo = $dateFrom;
+        } elseif (is_string($dateTo) && trim($dateTo) !== '' && (!is_string($dateFrom) || trim($dateFrom) === '')) {
+            $dateFrom = $dateTo;
+        } elseif (is_string($dateFrom) && is_string($dateTo) && trim($dateFrom) !== '' && trim($dateTo) !== '' && $dateFrom > $dateTo) {
+            [$dateFrom, $dateTo] = [$dateTo, $dateFrom];
+        }
+
         return new self(
             self::normalizeString($filters['status'] ?? null),
             self::normalizeString($filters['type'] ?? null),
@@ -37,8 +48,8 @@ final class MonitorTaskFilters
             self::normalizeString($filters['queue'] ?? null),
             self::normalizeEnum($filters['replay_mode'] ?? 'all', ['all', 'replays', 'originals'], 'all'),
             self::normalizeEnum($filters['error_mode'] ?? 'all', ['all', 'with_error', 'without_error'], 'all'),
-            self::parseDate($filters['date_from'] ?? null, false),
-            self::parseDate($filters['date_to'] ?? null, true),
+            self::parseDate($dateFrom, false),
+            self::parseDate($dateTo, true),
             $onlyDeadLetters || filter_var($filters['only_dead_letters'] ?? false, FILTER_VALIDATE_BOOLEAN),
         );
     }

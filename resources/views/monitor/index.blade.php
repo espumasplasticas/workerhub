@@ -776,7 +776,9 @@ document.getElementById('reset-filters-button').addEventListener('click', () => 
 Object.entries(filterInputs).forEach(([key, input]) => {
     input.addEventListener('change', () => {
         state.filters[key] = input.value;
+        normalizeDateFilterRange();
         saveFilters();
+        hydrateFilters();
         renderFilterSummary();
         refreshAll(true);
     });
@@ -880,7 +882,8 @@ nodes.openApiButton.addEventListener('click', () => {
 
 function loadStoredFilters() {
     try {
-        return { ...defaultFilters, ...(JSON.parse(window.localStorage.getItem(FILTER_STORAGE_KEY) || '{}')) };
+        const filters = { ...defaultFilters, ...(JSON.parse(window.localStorage.getItem(FILTER_STORAGE_KEY) || '{}')) };
+        return normalizeStoredDateFilterRange(filters);
     } catch (error) {
         return { ...defaultFilters };
     }
@@ -906,6 +909,41 @@ function hydrateFilters() {
     Object.entries(filterInputs).forEach(([key, input]) => {
         input.value = state.filters[key] || '';
     });
+}
+
+function normalizeDateFilterRange() {
+    const { date_from: dateFrom, date_to: dateTo } = state.filters;
+
+    if (dateFrom && !dateTo) {
+        state.filters.date_to = dateFrom;
+        return;
+    }
+
+    if (!dateFrom && dateTo) {
+        state.filters.date_from = dateTo;
+        return;
+    }
+
+    if (dateFrom && dateTo && dateFrom > dateTo) {
+        state.filters.date_from = dateTo;
+        state.filters.date_to = dateFrom;
+    }
+}
+
+function normalizeStoredDateFilterRange(filters) {
+    const normalized = { ...filters };
+
+    if (normalized.date_from && !normalized.date_to) {
+        normalized.date_to = normalized.date_from;
+    } else if (!normalized.date_from && normalized.date_to) {
+        normalized.date_from = normalized.date_to;
+    } else if (normalized.date_from && normalized.date_to && normalized.date_from > normalized.date_to) {
+        const from = normalized.date_from;
+        normalized.date_from = normalized.date_to;
+        normalized.date_to = from;
+    }
+
+    return normalized;
 }
 
 function operatorHeaders() {
@@ -1107,7 +1145,7 @@ async function refreshTasks(keepSelection = false) {
         return;
     }
 
-    const selected = state.tasks.find(task => task.id === state.selectedTaskId);
+    const selected = state.tasks.find(task => String(task.id) === String(state.selectedTaskId));
     if (selected) {
         await showTask(selected.id, { openModal: false });
     } else if (state.tasks[0]) {
@@ -1132,9 +1170,9 @@ function renderTasks() {
     }
 
     nodes.body.innerHTML = state.tasks.map(task => `
-        <tr data-task-id="${escapeHtml(task.id)}" class="${task.id === state.selectedTaskId ? 'is-selected' : ''}">
+        <tr data-task-id="${escapeHtml(task.id)}" class="${String(task.id) === String(state.selectedTaskId) ? 'is-selected' : ''}">
             <td class="task-id"><strong>${escapeHtml(task.id)}</strong><span class="mono">${escapeHtml(task.kafka_key || '-')}</span></td>
-            <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(task.id) ? 'checked' : ''} ${!task.can_retry ? 'disabled' : ''}></td>
+            <td><input class="checkbox task-selector" type="checkbox" value="${escapeHtml(task.id)}" ${state.selectedIds.has(String(task.id)) ? 'checked' : ''} ${!task.can_retry ? 'disabled' : ''}></td>
             <td><button class="detail-trigger" type="button" data-detail-task-id="${escapeHtml(task.id)}">Ver detalle</button></td>
             <td><span class="${badgeClass(task.status)}">${escapeHtml(task.status)}</span></td>
             <td><span class="${badgeClass('default')}">${escapeHtml(task.process_label || 'General')}</span></td>
@@ -1150,10 +1188,11 @@ function renderTasks() {
     nodes.body.querySelectorAll('.task-selector').forEach(input => {
         input.addEventListener('click', event => event.stopPropagation());
         input.addEventListener('change', event => {
+            const taskId = String(event.target.value);
             if (event.target.checked) {
-                state.selectedIds.add(event.target.value);
+                state.selectedIds.add(taskId);
             } else {
-                state.selectedIds.delete(event.target.value);
+                state.selectedIds.delete(taskId);
             }
         });
     });
@@ -1167,7 +1206,7 @@ function renderTasks() {
 }
 
 async function showTask(taskId, { openModal = false } = {}) {
-    state.selectedTaskId = taskId;
+    state.selectedTaskId = String(taskId);
     saveSelectedTaskId(taskId);
     renderTasks();
 
@@ -1200,7 +1239,7 @@ function renderTaskDetail(task) {
         return;
     }
 
-    state.selectedTaskId = task.id;
+    state.selectedTaskId = String(task.id);
     nodes.detailTitle.textContent = task.id;
     nodes.detailSubtitle.textContent = `${task.process_label || 'General'} - ${task.schedule_name || task.task_name || 'sin tarea programada'} - ${task.source || 'sin origen'}`;
     nodes.retryButton.disabled = !task.can_retry;
