@@ -192,6 +192,65 @@ class WorkerTaskReplayEligibilityServiceTest extends TestCase
         $this->assertTrue($result['siesa_state']['exists']);
     }
 
+    public function test_it_allows_receipt_cancellation_replay_when_receipt_is_already_cancelled_in_siesa(): void
+    {
+        $task = new WorkerTask([
+            'id' => 'task-receipt-cancel-1',
+            'type' => 'receipt_cancellation',
+            'status' => 'failed',
+            'payload' => [
+                'db_connection' => 'sqlsrv',
+                'operational_center' => '002',
+                'document_type' => 'B2',
+                'document_number' => '9828',
+            ],
+        ]);
+
+        $invoiceRepository = Mockery::mock(InvoicePrototypeRepository::class);
+        $invoiceRepository->shouldNotReceive('findHeader');
+
+        $invoiceSiesaStateService = Mockery::mock(InvoiceSiesaStateService::class);
+        $invoiceSiesaStateService->shouldNotReceive('fetch');
+
+        $orderRepository = Mockery::mock(OrderPrototypeRepository::class);
+        $orderRepository->shouldNotReceive('findHeader');
+
+        $orderSiesaStateService = Mockery::mock(OrderSiesaStateService::class);
+        $orderSiesaStateService->shouldNotReceive('fetch');
+
+        $orderDeliveryRepository = Mockery::mock(OrderDeliveryGenerationRepository::class);
+        $orderDeliveryRepository->shouldNotReceive('shouldGenerateDomicile');
+        $orderDeliveryRepository->shouldNotReceive('findActiveDomicileForEnterpriseOrder');
+
+        $receiptRepository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $receiptRepository->shouldReceive('findHeader')->once()->andReturn((object) [
+            'F350_ID_CO' => 'S01',
+            'F350_ID_TIPO_DOCTO' => 'RB2',
+            'F350_CONSEC_DOCTO' => '9828',
+        ]);
+
+        $receiptSiesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $receiptSiesaStateService->shouldReceive('fetch')
+            ->once()
+            ->andReturn(new \App\Data\Receipts\ReceiptSiesaStateSnapshot('002', 'B2', '9828', true, 'S01', 'RB2', '9828', 0.0, 0.0, 2));
+
+        $service = new WorkerTaskReplayEligibilityService(
+            $invoiceRepository,
+            $invoiceSiesaStateService,
+            $orderDeliveryRepository,
+            $orderRepository,
+            $orderSiesaStateService,
+            $receiptRepository,
+            $receiptSiesaStateService
+        );
+        $result = $service->inspect($task);
+
+        $this->assertTrue($result['can_retry']);
+        $this->assertNull($result['reason']);
+        $this->assertTrue($result['siesa_state']['exists']);
+        $this->assertSame(2, $result['siesa_state']['state_indicator']);
+    }
+
     public function test_it_allows_replay_for_non_receipt_failed_tasks(): void
     {
         $task = new WorkerTask([
