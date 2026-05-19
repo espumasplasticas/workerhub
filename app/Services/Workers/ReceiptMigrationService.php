@@ -126,13 +126,22 @@ class ReceiptMigrationService
                 );
             }
 
-            $measure('mark_migrated', fn () => $this->legacyStateService->markMigrated($payload));
-            $importSucceeded = true;
             $siesaStateAfter = $measure('fetch_siesa_state_after', fn () => $this->siesaStateService->fetch($payload, $header));
 
-            if ($siesaStateAfter->exists) {
-                $measure('mark_detected_in_siesa_after_import', fn () => $this->legacyStateService->markDetectedInSiesa($payload));
+            if (!$siesaStateAfter->exists) {
+                throw new WorkerTaskProcessingException(
+                    'El recibo fue enviado a Siesa, pero no se encontró en Siesa después de la importación.',
+                    [
+                        'payload' => $payload,
+                        'siesa_state_after' => $siesaStateAfter->toArray(),
+                        'siesa_web_service' => $audit->log->toArray(),
+                        'xml_payload' => $result->payload,
+                    ]
+                );
             }
+
+            $measure('mark_detected_in_siesa_after_import', fn () => $this->legacyStateService->markDetectedInSiesa($payload));
+            $importSucceeded = true;
 
             return [
                 'document_id' => $payload['document_id'] ?? $this->buildReference($payload),

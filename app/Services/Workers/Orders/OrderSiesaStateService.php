@@ -55,6 +55,13 @@ class OrderSiesaStateService
             }
         }
 
+        if ($row === null) {
+            // Some duplicate import failures are caused by a purchase order / load order
+            // reference that already exists in Siesa. In that case the document may be
+            // present under a different enterprise identity, so search by legacy reference.
+            $row = $this->findOrderByLegacyReference($connection, $reference['operational_center'], $header);
+        }
+
         return new OrderSiesaStateSnapshot(
             operationalCenter: $reference['operational_center'],
             documentType: $reference['document_type'],
@@ -88,6 +95,78 @@ class OrderSiesaStateService
             ),
             [$co, $type, $number]
         );
+    }
+
+    private function findOrderByLegacyReference(ConnectionInterface $connection, string $operationalCenter, stdClass $header): ?stdClass
+    {
+        $referenceDocumentNumber = $this->firstNonEmpty(
+            $header->f430_num_docto_referencia ?? null,
+            $header->PE_OrdenDeCompra ?? null,
+            $header->PE_OrdenDeCargue ?? null
+        );
+
+        $reference = $this->firstNonEmpty(
+            $header->f430_referencia ?? null,
+            $header->PE_OrdenDeCargue ?? null,
+            $header->PE_OrdenDeCompra ?? null
+        );
+
+        if ($referenceDocumentNumber === '' && $reference === '') {
+            return null;
+        }
+
+        $conditions = [];
+        $bindings = [];
+
+        if ($referenceDocumentNumber !== '') {
+            $conditions[] = 'RTRIM(f430_num_docto_referencia) = ?';
+            $bindings[] = $referenceDocumentNumber;
+        }
+
+        if ($reference !== '') {
+            $conditions[] = 'RTRIM(f430_referencia) = ?';
+            $bindings[] = $reference;
+        }
+
+        if ($conditions === []) {
+            return null;
+        }
+
+        $where = implode(' OR ', $conditions);
+
+        if ($operationalCenter !== '') {
+            $where = sprintf('(%s) AND RTRIM(f430_id_co) = ?', $where);
+            $bindings[] = $operationalCenter;
+        }
+
+        return $connection->selectOne(
+            sprintf(
+                "SELECT TOP 1
+                    RTRIM(f430_id_co) AS f430_id_co,
+                    RTRIM(f430_id_tipo_docto) AS f430_id_tipo_docto,
+                    RTRIM(CONVERT(varchar(50), f430_consec_docto)) AS f430_consec_docto,
+                    f430_rowid,
+                    f430_ind_estado
+                FROM %s
+                WHERE %s",
+                $this->enterpriseOrdersTable(),
+                $where
+            ),
+            $bindings
+        );
+    }
+
+    private function firstNonEmpty(mixed ...$candidates): string
+    {
+        foreach ($candidates as $candidate) {
+            $value = trim((string) ($candidate ?? ''));
+
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
     }
 
     private function findNetTotal(ConnectionInterface $connection, int $rowId): ?float

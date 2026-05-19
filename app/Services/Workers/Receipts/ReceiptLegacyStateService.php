@@ -29,10 +29,6 @@ class ReceiptLegacyStateService
             'RH_IndicadorPedidoEstaMigrado' => 0,
             'RH_ConsecutivoDeMigracion' => 0,
         ]);
-
-        $this->receiptQuery($payload)->update([
-            'RE_IndicadorMigrado' => 1,
-        ]);
     }
 
     public function markMigrationFailed(array $payload): void
