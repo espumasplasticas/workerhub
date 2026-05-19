@@ -2,6 +2,7 @@
 
 namespace App\Services\Workers\Orders;
 
+use App\Data\Orders\OrderSiesaStateSnapshot;
 use Illuminate\Contracts\Config\Repository;
 use Illuminate\Database\ConnectionInterface;
 use Illuminate\Database\DatabaseManager;
