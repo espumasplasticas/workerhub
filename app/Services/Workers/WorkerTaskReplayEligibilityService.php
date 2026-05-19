@@ -30,6 +30,14 @@ class WorkerTaskReplayEligibilityService
      */
     public function inspect(WorkerTask $task): array
     {
+        if ($task->status === 'replayed' || $task->replayed_at !== null) {
+            return [
+                'can_retry' => false,
+                'reason' => 'La tarea ya fue reencolada. Revisa el ultimo intento del lineage.',
+                'siesa_state' => null,
+            ];
+        }
+
         if (!in_array($task->status, ['failed', 'rejected'], true)) {
             return [
                 'can_retry' => false,

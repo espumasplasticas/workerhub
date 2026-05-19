@@ -16,6 +16,55 @@ use Tests\TestCase;
 
 class WorkerTaskReplayEligibilityServiceTest extends TestCase
 {
+    public function test_it_blocks_replay_when_task_was_already_replayed(): void
+    {
+        $task = new WorkerTask([
+            'id' => 'task-replayed',
+            'type' => 'receipt_cancellation',
+            'status' => 'failed',
+            'replayed_at' => now(),
+        ]);
+
+        $invoiceRepository = Mockery::mock(InvoicePrototypeRepository::class);
+        $invoiceRepository->shouldNotReceive('findHeader');
+
+        $invoiceSiesaStateService = Mockery::mock(InvoiceSiesaStateService::class);
+        $invoiceSiesaStateService->shouldNotReceive('fetch');
+
+        $orderRepository = Mockery::mock(OrderPrototypeRepository::class);
+        $orderRepository->shouldNotReceive('findHeader');
+        $orderRepository->shouldNotReceive('findOrderRecord');
+
+        $orderSiesaStateService = Mockery::mock(OrderSiesaStateService::class);
+        $orderSiesaStateService->shouldNotReceive('fetch');
+
+        $orderDeliveryRepository = Mockery::mock(OrderDeliveryGenerationRepository::class);
+        $orderDeliveryRepository->shouldNotReceive('shouldGenerateDomicile');
+        $orderDeliveryRepository->shouldNotReceive('findActiveDomicileForEnterpriseOrder');
+
+        $receiptRepository = Mockery::mock(ReceiptPrototypeRepository::class);
+        $receiptRepository->shouldNotReceive('findHeader');
+
+        $receiptSiesaStateService = Mockery::mock(ReceiptSiesaStateService::class);
+        $receiptSiesaStateService->shouldNotReceive('fetch');
+
+        $service = new WorkerTaskReplayEligibilityService(
+            $invoiceRepository,
+            $invoiceSiesaStateService,
+            $orderDeliveryRepository,
+            $orderRepository,
+            $orderSiesaStateService,
+            $receiptRepository,
+            $receiptSiesaStateService
+        );
+
+        $result = $service->inspect($task);
+
+        $this->assertFalse($result['can_retry']);
+        $this->assertSame('La tarea ya fue reencolada. Revisa el ultimo intento del lineage.', $result['reason']);
+        $this->assertNull($result['siesa_state']);
+    }
+
     public function test_it_blocks_replay_when_order_already_exists_in_siesa(): void
     {
         $task = new WorkerTask([

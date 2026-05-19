@@ -262,6 +262,7 @@
         .badge { display:inline-flex; align-items:center; border-radius:999px; padding:6px 10px; font-size:12px; font-weight:700; letter-spacing:.04em; }
         .badge.received, .badge.published, .badge.queued, .badge.processing { background:var(--accent-soft); color:var(--accent); }
         .badge.completed { background:var(--success-soft); color:var(--success); }
+        .badge.replayed { background:#eef2ff; color:#3554a5; }
         .badge.failed, .badge.rejected { background:var(--danger-soft); color:var(--danger); }
         .badge.default { background:rgba(96,119,156,.12); color:#4d6186; }
         .badge.high { background:var(--warn-soft); color:var(--warn); }
@@ -532,6 +533,7 @@
                         <option value="processing">processing</option>
                         <option value="completed">completed</option>
                         <option value="failed">failed</option>
+                        <option value="replayed">replayed</option>
                         <option value="rejected">rejected</option>
                     </select>
                 </div>

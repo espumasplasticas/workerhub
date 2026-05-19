@@ -201,6 +201,7 @@ class WorkerTaskMonitorService
     {
         $tasks = $this->queryTasks($filters)
             ->whereIn('status', ['failed', 'rejected'])
+            ->whereNull('replayed_at')
             ->latest('requested_at')
             ->limit(max($limit * 3, $limit))
             ->get();
@@ -243,7 +244,7 @@ class WorkerTaskMonitorService
     {
         $base = WorkerTask::query();
         $processDefinitions = $this->processCatalog->definitions();
-        $tasks = (clone $base)->get(['status', 'metadata']);
+        $tasks = (clone $base)->get(['status', 'metadata', 'replayed_at']);
         $processSummary = [];
 
         foreach ($processDefinitions as $definition) {
@@ -259,7 +260,9 @@ class WorkerTaskMonitorService
                 'label' => (string) ($definition['label'] ?? $key),
                 'description' => $definition['description'] ?? null,
                 'total' => $processTasks->count(),
-                'failed' => $processTasks->whereIn('status', ['failed', 'rejected'])->count(),
+                'failed' => $processTasks
+                    ->filter(fn (WorkerTask $task): bool => in_array($task->status, ['failed', 'rejected'], true) && $task->replayed_at === null)
+                    ->count(),
                 'processing' => $processTasks->where('status', 'processing')->count(),
                 'completed' => $processTasks->where('status', 'completed')->count(),
             ];
@@ -272,8 +275,8 @@ class WorkerTaskMonitorService
             'queued' => (clone $base)->where('status', 'queued')->count(),
             'processing' => (clone $base)->where('status', 'processing')->count(),
             'completed' => (clone $base)->where('status', 'completed')->count(),
-            'failed' => (clone $base)->whereIn('status', ['failed', 'rejected'])->count(),
-            'dead_letters' => (clone $base)->whereIn('status', ['failed', 'rejected'])->count(),
+            'failed' => (clone $base)->whereIn('status', ['failed', 'rejected'])->whereNull('replayed_at')->count(),
+            'dead_letters' => (clone $base)->whereIn('status', ['failed', 'rejected'])->whereNull('replayed_at')->count(),
             'replayed' => (clone $base)->whereNotNull('parent_task_id')->count(),
             'processes' => $processSummary,
         ];
@@ -329,6 +332,7 @@ class WorkerTaskMonitorService
         $metadata['replays'] = $replays;
 
         $task->forceFill([
+            'status' => 'replayed',
             'metadata' => $metadata,
             'replayed_at' => now(),
         ])->save();
@@ -361,7 +365,21 @@ class WorkerTaskMonitorService
     private function queryTasks(MonitorTaskFilters $filters): Builder
     {
         return WorkerTask::query()
-            ->when($filters->status !== null, fn (Builder $query) => $query->where('status', $filters->status))
+            ->when($filters->status !== null, function (Builder $query) use ($filters) {
+                if ($filters->status === 'replayed') {
+                    $query->where(function (Builder $builder) {
+                        $builder->where('status', 'replayed')->orWhereNotNull('replayed_at');
+                    });
+
+                    return;
+                }
+
+                $query->where('status', $filters->status);
+
+                if (in_array($filters->status, ['failed', 'rejected'], true)) {
+                    $query->whereNull('replayed_at');
+                }
+            })
             ->when($filters->type !== null, fn (Builder $query) => $query->where('type', $filters->type))
             ->when($filters->source !== null, fn (Builder $query) => $query->where('source', $filters->source))
             ->when($filters->processKey !== null, fn (Builder $query) => $query->where('metadata->process_key', $filters->processKey))
@@ -370,7 +388,7 @@ class WorkerTaskMonitorService
             ->when($filters->queue !== null, fn (Builder $query) => $query->where('queue', $filters->queue))
             ->when($filters->dateFrom !== null, fn (Builder $query) => $query->where('requested_at', '>=', $filters->dateFrom))
             ->when($filters->dateTo !== null, fn (Builder $query) => $query->where('requested_at', '<=', $filters->dateTo))
-            ->when($filters->onlyDeadLetters, fn (Builder $query) => $query->whereIn('status', ['failed', 'rejected']))
+            ->when($filters->onlyDeadLetters, fn (Builder $query) => $query->whereIn('status', ['failed', 'rejected'])->whereNull('replayed_at'))
             ->when($filters->replayMode === 'replays', fn (Builder $query) => $query->whereNotNull('parent_task_id'))
             ->when($filters->replayMode === 'originals', fn (Builder $query) => $query->whereNull('parent_task_id'))
             ->when($filters->errorMode === 'with_error', function (Builder $query) {
@@ -389,6 +407,9 @@ class WorkerTaskMonitorService
     private function serializeTask(WorkerTask $task): array
     {
         $eligibility = $this->replayEligibility->inspect($task);
+        $status = $task->replayed_at !== null && in_array($task->status, ['failed', 'rejected'], true)
+            ? 'replayed'
+            : $task->status;
 
         return [
             'id' => $task->id,
@@ -399,7 +420,7 @@ class WorkerTaskMonitorService
             'process_label' => is_array($task->metadata) ? ($task->metadata['process_label'] ?? 'General') : 'General',
             'schedule_name' => is_array($task->metadata) ? ($task->metadata['schedule_name'] ?? null) : null,
             'task_name' => is_array($task->metadata) ? ($task->metadata['task_name'] ?? null) : null,
-            'status' => $task->status,
+            'status' => $status,
             'priority' => $task->priority,
             'queue' => $task->queue,
             'kafka_topic' => $task->kafka_topic,
@@ -458,7 +479,9 @@ class WorkerTaskMonitorService
             'process_key' => is_array($task->metadata) ? ($task->metadata['process_key'] ?? 'general') : 'general',
             'process_label' => is_array($task->metadata) ? ($task->metadata['process_label'] ?? 'General') : 'General',
             'schedule_name' => is_array($task->metadata) ? ($task->metadata['schedule_name'] ?? null) : null,
-            'status' => $task->status,
+            'status' => $task->replayed_at !== null && in_array($task->status, ['failed', 'rejected'], true)
+                ? 'replayed'
+                : $task->status,
             'priority' => $task->priority,
             'queue' => $task->queue,
             'error_message' => $task->error_message,

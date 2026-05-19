@@ -274,6 +274,11 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'priority' => 'high',
         ]);
 
+        $this->assertDatabaseHas('worker_tasks', [
+            'id' => 'task-dead-letter',
+            'status' => 'replayed',
+        ]);
+
         $this->assertDatabaseHas('worker_task_events', [
             'worker_task_id' => 'task-dead-letter',
             'event' => 'task.replayed',
@@ -284,6 +289,40 @@ class WorkerTaskMonitorControllerTest extends TestCase
             'status' => 'success',
             'worker_task_id' => 'task-dead-letter',
         ]);
+    }
+
+    public function test_replayed_tasks_are_not_reported_as_active_dead_letters(): void
+    {
+        WorkerTask::query()->create([
+            'id' => 'task-replayed',
+            'type' => 'document_migration',
+            'status' => 'failed',
+            'priority' => 'default',
+            'replayed_at' => now(),
+        ]);
+
+        WorkerTask::query()->create([
+            'id' => 'task-failed-active',
+            'type' => 'document_migration',
+            'status' => 'failed',
+            'priority' => 'default',
+        ]);
+
+        $this->getJson('/api/monitor/tasks/summary')
+            ->assertOk()
+            ->assertJsonPath('failed', 1)
+            ->assertJsonPath('dead_letters', 1);
+
+        $this->getJson('/api/monitor/dead-letters')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', 'task-failed-active');
+
+        $this->getJson('/api/monitor/tasks?status=replayed')
+            ->assertOk()
+            ->assertJsonCount(1, 'data')
+            ->assertJsonPath('data.0.id', 'task-replayed')
+            ->assertJsonPath('data.0.status', 'replayed');
     }
 
     public function test_it_replays_multiple_failed_tasks_in_batch(): void
